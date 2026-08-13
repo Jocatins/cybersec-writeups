@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>R0b0 Riddle – CTF Write-Up</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+:root{
+    --bg:#0d1117;
+    --card:#161b22;
+    --border:#30363d;
+    --primary:#58a6ff;
+    --success:#3fb950;
+    --text:#e6edf3;
+    --muted:#8b949e;
+    --code:#010409;
+}
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    line-height:1.8;
+}
+
+.container{
+    width:min(1100px,90%);
+    margin:auto;
+    padding:50px 0;
+}
+
+.hero{
+    text-align:center;
+    margin-bottom:50px;
+}
+
+.hero h1{
+    font-size:3rem;
+    color:var(--primary);
+    margin-bottom:10px;
+}
+
+.hero p{
+    color:var(--muted);
+}
+
+.section{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:30px;
+    margin-bottom:30px;
+}
+
+.section h2{
+    color:var(--primary);
+    margin-bottom:20px;
+    font-size:1.7rem;
+}
+
+.section h3{
+    margin:20px 0 10px;
+    color:#79c0ff;
+}
+
+p{
+    margin-bottom:15px;
+}
+
+code{
+    font-family:'Fira Code', monospace;
+    color:#7ee787;
+}
+
+pre{
+    background:var(--code);
+    border:1px solid var(--border);
+    padding:18px;
+    border-radius:12px;
+    overflow-x:auto;
+    margin:20px 0;
+}
+
+pre code{
+    color:#c9d1d9;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:20px;
+}
+
+th{
+    background:#1f2937;
+    color:white;
+}
+
+th,td{
+    border:1px solid var(--border);
+    padding:14px;
+    text-align:left;
+}
+
+tr:nth-child(even){
+    background:#111827;
+}
+
+ul,ol{
+    margin-left:25px;
+}
+
+li{
+    margin-bottom:10px;
+}
+
+.note{
+    background:rgba(88,166,255,.1);
+    border-left:4px solid var(--primary);
+    padding:18px;
+    border-radius:10px;
+    margin-top:20px;
+}
+
+.flag-box{
+    background:rgba(63,185,80,.1);
+    border:1px solid rgba(63,185,80,.3);
+    border-radius:12px;
+    padding:20px;
+    margin-top:20px;
+}
+
+.flag-box h3{
+    color:var(--success);
+}
+
+.footer{
+    text-align:center;
+    color:var(--muted);
+    margin-top:40px;
+}
+
+@media(max-width:768px){
+
+.hero h1{
+    font-size:2rem;
+}
+
+.section{
+    padding:20px;
+}
+
+table{
+    display:block;
+    overflow-x:auto;
+}
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+    <div class="hero">
+        <h1>🤖 R0b0 Riddle – CTF Write-Up</h1>
+        <p>robots.txt Enumeration • Base64 Analysis • Flag Discovery</p>
+    </div>
+
+    <section class="section">
+        <h2>Challenge Overview</h2>
+
+        <p>
+            In this challenge, we were presented with a futuristic scenario
+            in which robots had taken control of the world. Our objective was
+            to infiltrate a robot control server and recover a secret key that
+            could save humanity.
+        </p>
+
+        <p>
+            The challenge hints suggested that the server was hiding information
+            in plain sight and specifically directed us toward examining the
+            <code>robots.txt</code> file.
+        </p>
+    </section>
+
+    <section class="section">
+        <h2>Reconnaissance</h2>
+
+        <p>Inspecting the robots.txt file revealed several unusual paths:</p>
+
+<pre><code>User-agent: *
+Disallow: /dHJlYXN1cmUudHh0
+Disallow: /c2VjcmV0LnR4dA==
+Disallow: /Y2F0Y2hfbWVfaWZfdV9jYW4vZmxhZy50eHQ=
+Disallow: /YWRtaW4udHh0
+</code></pre>
+
+        <p>
+            At first glance, these paths appeared to be random strings rather
+            than normal file names.
+        </p>
+    </section>
+
+    <section class="section">
+        <h2>Analysis</h2>
+
+        <p>
+            Based on the challenge hints, the paths appeared to be encoded.
+            Their format strongly resembled Base64.
+        </p>
+
+        <h3>CyberChef Steps</h3>
+
+        <ol>
+            <li>Open CyberChef</li>
+            <li>Paste each encoded string</li>
+            <li>Apply "From Base64"</li>
+            <li>Observe the output</li>
+        </ol>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Encoded Path</th>
+                    <th>Decoded Path</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>dHJlYXN1cmUudHh0</td>
+                    <td>treasure.txt</td>
+                </tr>
+                <tr>
+                    <td>c2VjcmV0LnR4dA==</td>
+                    <td>secret.txt</td>
+                </tr>
+                <tr>
+                    <td>Y2F0Y2hfbWVfaWZfdV9jYW4vZmxhZy50eHQ=</td>
+                    <td>catch_me_if_u_can/flag.txt</td>
+                </tr>
+                <tr>
+                    <td>YWRtaW4udHh0</td>
+                    <td>admin.txt</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="section">
+        <h2>Exploitation</h2>
+
+        <p>
+            After decoding the discovered paths, each file was manually
+            investigated.
+        </p>
+
+        <p>
+            The most suspicious result was:
+        </p>
+
+<pre><code>catch_me_if_u_can/flag.txt</code></pre>
+
+        <p>
+            This matched the challenge hint referencing the movie
+            <em>Catch Me If You Can</em>.
+        </p>
+
+<pre><code>https://challenge-site/catch_me_if_u_can/flag.txt</code></pre>
+
+        <div class="flag-box">
+            <h3>🚩 Flag Discovery</h3>
+            <p>
+                The challenge flag was exposed directly inside the file and
+                required no additional decoding.
+            </p>
+        </div>
+    </section>
+
+    <section class="section">
+        <h2>Vulnerability Identified</h2>
+
+        <h3>Information Disclosure via robots.txt</h3>
+
+        <p>
+            The application exposed sensitive resources through its
+            <code>robots.txt</code> file.
+        </p>
+
+        <div class="note">
+            <strong>Important:</strong> robots.txt is not an access control
+            mechanism. It only provides instructions to search engine crawlers.
+        </div>
+
+        <p>
+            Developers attempted to hide paths using Base64 encoding.
+            However, Base64 is simply an encoding format and provides
+            no security.
+        </p>
+    </section>
+
+    <section class="section">
+        <h2>Tools Used</h2>
+
+        <ul>
+            <li>Web Browser</li>
+            <li>CyberChef</li>
+            <li>Base64 Decoding Techniques</li>
+            <li>Manual Directory Enumeration</li>
+        </ul>
+    </section>
+
+    <section class="section">
+        <h2>Key Takeaways</h2>
+
+        <ol>
+            <li>Always inspect robots.txt during reconnaissance.</li>
+            <li>Base64 is not a security mechanism.</li>
+            <li>Hidden directories often contain valuable clues.</li>
+            <li>Follow challenge hints carefully.</li>
+            <li>Security through obscurity is ineffective.</li>
+            <li>Enumeration frequently leads to flag discovery.</li>
+        </ol>
+    </section>
+
+    <section class="section">
+        <h2>Lessons Learned</h2>
+
+        <p>
+            This challenge demonstrated how attackers can leverage publicly
+            available information to discover hidden resources. It reinforced
+            the importance of examining common reconnaissance targets such as
+            <code>robots.txt</code> and recognizing common encodings like
+            Base64 during investigations.
+        </p>
+    </section>
+
+    <div class="footer">
+        © CTF Write-Up • R0b0 Riddle
+    </div>
+
+</div>
+
+</body>
+</html>

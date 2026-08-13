@@ -1,0 +1,334 @@
+{
+  "main": {
+    "id": "84e5cee1aeec1581",
+    "type": "split",
+    "children": [
+      {
+        "id": "4ea0740684acecf1",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "6b364a11fe98cd44",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "IP Addresses.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "IP Addresses"
+            }
+          },
+          {
+            "id": "962e628bc7107d37",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Subnetting.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Subnetting"
+            }
+          },
+          {
+            "id": "800fd55bacf81f80",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Commands.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Commands"
+            }
+          },
+          {
+            "id": "b3362204cfad8c11",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Bash Scripting.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Bash Scripting"
+            }
+          },
+          {
+            "id": "a6ea8086ae301d02",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Passive Recon.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Passive Recon"
+            }
+          },
+          {
+            "id": "6c1e65ba8c9f41f7",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Enumeration.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Enumeration"
+            }
+          },
+          {
+            "id": "5b3ce048a864bddb",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Sockets.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Sockets"
+            }
+          },
+          {
+            "id": "e05c8234c5921e30",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Burp Intercepting.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Burp Intercepting"
+            }
+          },
+          {
+            "id": "96ae48895d337fb8",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Pentesting Tools.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Pentesting Tools"
+            }
+          },
+          {
+            "id": "e61f37e39d9fc48c",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "XSS attacks.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "XSS attacks"
+            }
+          }
+        ],
+        "currentTab": 9
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "e6d7242d4a6f9fc2",
+    "type": "split",
+    "children": [
+      {
+        "id": "d89147042debcdd7",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "0f29d86223b7d237",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "2c17f294b4f5b974",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "d7e82bac941f5671",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 200
+  },
+  "right": {
+    "id": "21114e8de6bc5c1d",
+    "type": "split",
+    "children": [
+      {
+        "id": "b80f89e49daa2d96",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "bda8dd76bc168cdb",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "Commands.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for Commands"
+            }
+          },
+          {
+            "id": "4ee6191684735175",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "Commands.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from Commands"
+            }
+          },
+          {
+            "id": "69267f3d80972676",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "cab316709858cc92",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "bb256b4867e5d1ac",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "Commands.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of Commands"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "e61f37e39d9fc48c",
+  "lastOpenFiles": [
+    "Pentesting Tools.md",
+    "XSS attacks.md",
+    "Burp Intercepting.md",
+    "Sockets.md",
+    "Enumeration.md",
+    "Passive Recon.md",
+    "Bash Scripting.md",
+    "Commands.md",
+    "CHMOD numbers.md",
+    "Pasted image 20260313150537.png",
+    "Subnetting.md",
+    "Pasted image 20260313103048.png",
+    "Pasted image 20260312144355.png",
+    "Welcome.md",
+    "IP Addresses.md",
+    "Pasted image 20260311171500.png",
+    "The OSI Model.md",
+    "desktop.ini"
+  ]
+}

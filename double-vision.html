@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTF Write-up - Double Vision</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            line-height: 1.7;
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f4f4f4;
+            color: #333;
+        }
+
+        h1, h2, h3 {
+            color: #0b5394;
+        }
+
+        pre {
+            background: #1e1e1e;
+            color: #dcdcdc;
+            padding: 15px;
+            overflow-x: auto;
+            border-radius: 6px;
+        }
+
+        code {
+            color: #ffcc66;
+        }
+
+        .note {
+            background: #fff3cd;
+            border-left: 5px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .success {
+            background: #d4edda;
+            border-left: 5px solid #28a745;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        table, th, td {
+            border: 1px solid #ccc;
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+
+        ul li {
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>CTF Write-up: Double Vision</h1>
+
+<h2>Challenge Description</h2>
+
+<p>
+An image appeared completely normal, but the challenge hinted that additional
+information was hidden inside the file. The objectives were to inspect the file,
+identify embedded data, extract hidden content, and recover the flag.
+</p>
+
+<hr>
+
+<h2>Tools Used</h2>
+
+<ul>
+    <li>file</li>
+    <li>binwalk</li>
+    <li>dd</li>
+    <li>xdg-open</li>
+</ul>
+
+<hr>
+
+<h2>Step 1 - Identify the File</h2>
+
+<p>First, determine the actual file type.</p>
+
+<pre><code>file Challenge.jpg</code></pre>
+
+<p>Output:</p>
+
+<pre><code>Challenge.jpg: JPEG image data, JFIF standard 1.02,
+resolution 72x72,
+5184 x 3456,
+components 3</code></pre>
+
+<p>
+The file appeared to be a perfectly normal JPEG image.
+</p>
+
+<hr>
+
+<h2>Step 2 - Check File Size</h2>
+
+<p>Inspect the file size.</p>
+
+<pre><code>ls -lh Challenge.jpg</code></pre>
+
+<p>Output:</p>
+
+<pre><code>-rw-rw-r-- 1 kali kali 1.5M Challenge.jpg</code></pre>
+
+<p>
+Nothing unusual was immediately apparent.
+</p>
+
+<hr>
+
+<h2>Step 3 - Scan for Embedded Files</h2>
+
+<p>
+Since the challenge hinted that data might be hidden inside the image,
+the next step was to inspect the binary structure using <strong>binwalk</strong>.
+</p>
+
+<pre><code>binwalk Challenge.jpg</code></pre>
+
+<p>Output:</p>
+
+<pre><code>DECIMAL       HEXADECIMAL     DESCRIPTION
+--------------------------------------------------------------
+0             0x0             JPEG image
+382           Copyright string
+211234        JBOOT STAG header
+1529267       PNG image, 895 x 237
+1529358       Zlib compressed data</code></pre>
+
+<p>
+The important discovery was that a complete <strong>PNG image</strong>
+was embedded near the end of the JPEG.
+</p>
+
+<div class="note">
+<strong>Observation:</strong><br>
+The detected JBOOT header was likely a false positive.
+The embedded PNG was the real target.
+</div>
+
+<hr>
+
+<h2>Step 4 - Attempt Automatic Extraction</h2>
+
+<pre><code>binwalk -e Challenge.jpg</code></pre>
+
+<p>Result:</p>
+
+<pre><code>WARNING:
+One or more files failed to extract.</code></pre>
+
+<p>
+Binwalk detected the hidden data but could not automatically extract it.
+Manual extraction was required.
+</p>
+
+<hr>
+
+<h2>Step 5 - Manually Carve the Embedded PNG</h2>
+
+<p>
+Binwalk reported that the PNG started at offset
+<strong>1529267</strong>.
+Using <code>dd</code>, the embedded image was extracted.
+</p>
+
+<pre><code>dd if=Challenge.jpg of=hidden.png bs=1 skip=1529267</code></pre>
+
+<hr>
+
+<h2>Step 6 - Verify the Extracted File</h2>
+
+<pre><code>file hidden.png</code></pre>
+
+<p>Output:</p>
+
+<pre><code>hidden.png:
+PNG image data,
+895 x 237,
+8-bit/color RGBA,
+non-interlaced</code></pre>
+
+<p>
+The extracted file was confirmed to be a valid PNG image.
+</p>
+
+<hr>
+
+<h2>Step 7 - Open the Hidden Image</h2>
+
+<p>
+The extracted image was opened using the system image viewer.
+</p>
+
+<pre><code>xdg-open hidden.png</code></pre>
+
+<div class="success">
+<h3>Success!</h3>
+
+<p>
+The hidden PNG displayed the challenge flag directly.
+No additional steganography or decoding was required.
+</p>
+</div>
+
+<hr>
+
+<h2>Lessons Learned</h2>
+
+<ul>
+    <li>Files can contain multiple embedded file formats.</li>
+    <li>A JPEG may have another complete file appended to its end.</li>
+    <li>Binwalk is excellent for identifying embedded file signatures.</li>
+    <li>If automatic extraction fails, manually carve files using <code>dd</code>.</li>
+    <li>Always verify extracted files with the <code>file</code> command.</li>
+    <li>Sometimes the hidden file simply needs to be opened to reveal the flag.</li>
+</ul>
+
+<hr>
+
+<h2>Key Commands Used</h2>
+
+<pre><code>file Challenge.jpg
+
+ls -lh Challenge.jpg
+
+binwalk Challenge.jpg
+
+binwalk -e Challenge.jpg
+
+dd if=Challenge.jpg of=hidden.png bs=1 skip=1529267
+
+file hidden.png
+
+xdg-open hidden.png
+</code></pre>
+
+<hr>
+
+<h2>Conclusion</h2>
+
+<p>
+The challenge demonstrated a classic digital forensics technique where one file
+is embedded inside another. Although the JPEG appeared ordinary, binary analysis
+revealed an appended PNG image. After manually extracting the PNG using the
+offset identified by Binwalk, opening the image immediately revealed the flag.
+This exercise reinforced the importance of performing thorough forensic
+enumeration rather than trusting a file solely based on its extension or
+appearance.
+</p>
+
+</body>
+</html>

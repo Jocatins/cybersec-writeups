@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>CTF Writeup - Patch It Up</title>
+
+    <style>
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Tahoma, sans-serif;
+        background: linear-gradient(135deg, #0f172a, #1e293b);
+        color: #e2e8f0;
+        line-height: 1.6;
+      }
+
+      header {
+        padding: 40px;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      header h1 {
+        margin: 0;
+        font-size: 2.2rem;
+        color: #38bdf8;
+      }
+
+      header p {
+        color: #94a3b8;
+        margin-top: 10px;
+      }
+
+      .container {
+        max-width: 900px;
+        margin: auto;
+        padding: 30px;
+      }
+
+      .card {
+        background: rgba(255, 255, 255, 0.06);
+        padding: 20px;
+        margin-bottom: 20px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+      }
+
+      .card h2 {
+        color: #60a5fa;
+        margin-top: 0;
+      }
+
+      code {
+        background: #0b1220;
+        padding: 2px 6px;
+        border-radius: 6px;
+        color: #fbbf24;
+      }
+
+      .highlight {
+        color: #34d399;
+        font-weight: bold;
+      }
+
+      footer {
+        text-align: center;
+        padding: 20px;
+        color: #64748b;
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+
+  <body>
+    <header>
+      <h1>🔐 CTF Writeup: Patch It Up</h1>
+      <p>Binary Reversing • GDB • Ghidra • XOR Decoding</p>
+    </header>
+
+    <div class="container">
+      <div class="card">
+        <h2>🧠 Challenge Overview</h2>
+        <p>
+          We were given an ELF binary called <code>chall2</code> that looked
+          like a normal password-checking program, but it was intentionally
+          broken. The goal was to understand and fix its logic to retrieve the
+          flag.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>🔍 Step 1: Reconnaissance & Initial Execution</h2>
+
+        <p>
+          The first step was to understand how the binary behaves at runtime. We
+          executed it directly to observe input prompts and execution flow.
+        </p>
+
+        <code>./chall2</code>
+
+        <p>
+          This revealed an interactive “Binary Lock” interface requiring four
+          numeric inputs:
+        </p>
+
+        <code>
+          Key 1:<br />
+          Key 2:<br />
+          Key 3:<br />
+          Key 4:
+        </code>
+
+        <p>
+          Entering the advertised sequence <code>1 3 3 7</code> immediately
+          showed that the program was validating each input individually and
+          failing at Gate 1.
+        </p>
+
+        <p>
+          To gather more information, we inspected binary metadata and embedded
+          strings:
+        </p>
+
+        <code>file chall2</code><br />
+        <code>strings chall2 | head -50</code>
+
+        <p>This revealed important hints such as:</p>
+
+        <ul>
+          <li>Unstripped ELF binary (function names visible)</li>
+          <li>Gate-based validation system</li>
+          <li>Pass sequence hint: 1 3 3 7</li>
+        </ul>
+
+        <p>
+          At this stage, it was clear that the challenge required deeper reverse
+          engineering rather than brute-force guessing.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>⚙️ Reverse Engineering (GDB)</h2>
+        <p>Using GDB, we disassembled each gate function and discovered:</p>
+        <ul>
+          <li>Gate 1 expected <code>0xDEAD</code> instead of 1</li>
+          <li>Gate 2 expected <code>0xBEEF</code> instead of 3</li>
+          <li>Gate 3 expected <code>0xCAFE</code> instead of 3</li>
+          <li>Gate 4 expected <code>0xFACE</code> instead of 7</li>
+        </ul>
+        <p>
+          These were intentional logic swaps designed to mislead normal
+          execution.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>🧪 Exploitation (Full Reverse Engineering Workflow)</h2>
+
+        <p>
+          The exploitation phase was not immediate guessing — it was a
+          structured reverse engineering process using Linux tooling and GDB to
+          inspect how each gate validated input.
+        </p>
+
+        <h3>🔍 Step 1: Binary Reconnaissance</h3>
+        <p>
+          We first identified that the binary was an unstripped 64-bit ELF,
+          which meant function names were still available.
+        </p>
+
+        <code>file chall2</code><br />
+        <code>strings chall2 | head</code>
+
+        <p>
+          This revealed references to four gate functions and hinted at a “Pass
+          sequence: 1 3 3 7”.
+        </p>
+
+        <h3>⚙️ Step 2: Locating Gate Logic</h3>
+        <p>Using symbol lookup, we extracted function addresses:</p>
+
+        <code>nm -C chall2 | grep gate</code>
+
+        <p>
+          This confirmed the presence of:
+          <code>gate1</code>, <code>gate2</code>, <code>gate3</code>, and
+          <code>gate4</code>.
+        </p>
+
+        <h3>🧠 Step 3: Disassembling Each Gate (GDB)</h3>
+        <p>
+          Each gate was inspected individually using GDB to understand the
+          comparison logic.
+        </p>
+
+        <code>gdb chall2</code><br />
+        <code>disassemble gate1</code><br />
+        <code>disassemble gate2</code><br />
+        <code>disassemble gate3</code><br />
+        <code>disassemble gate4</code>
+
+        <p>
+          This revealed that each function was performing a simple integer
+          comparison against a hidden constant.
+        </p>
+
+        <h3>🔓 Step 4: Extracting the Expected Values</h3>
+        <p>From the disassembly, we extracted the hardcoded comparisons:</p>
+
+        <ul>
+          <li><code>0xDEAD</code> (Gate 1)</li>
+          <li><code>0xBEEF</code> (Gate 2)</li>
+          <li><code>0xCAFE</code> (Gate 3)</li>
+          <li><code>0xFACE</code> (Gate 4)</li>
+        </ul>
+
+        <p>
+          These were converted into decimal because the program reads integer
+          input:
+        </p>
+
+        <code
+          >python3 -c "print(int('DEAD',16), int('BEEF',16), int('CAFE',16),
+          int('FACE',16))"</code
+        >
+
+        <p>Output:</p>
+
+        <code>57005 48879 51966 64206</code>
+
+        <h3>🚀 Step 5: Exploitation</h3>
+        <p>
+          Instead of patching the binary, we directly supplied the extracted
+          values at runtime:
+        </p>
+
+        <code>./chall2</code><br /><br />
+
+        <code>
+          Key 1: 57005<br />
+          Key 2: 48879<br />
+          Key 3: 51966<br />
+          Key 4: 64206
+        </code>
+
+        <p>
+          This satisfied all gate conditions, allowing execution to proceed past
+          validation successfully.
+        </p>
+
+        <p>
+          Each gate returned success, confirming that the reverse-engineered
+          constants were correct.
+        </p>
+
+        <h3>📌 Key Insight</h3>
+        <p>
+          The challenge demonstrated that reversing the logic is often more
+          effective than modifying the binary. Once the conditional checks are
+          understood, solving becomes a matter of aligning input with expected
+          machine logic.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>🔓 Flag Extraction (Runtime Decoding & XOR Reversal)</h2>
+
+        <p>
+          After successfully passing all four gates, the program did not
+          directly print a plaintext flag. Instead, it executed a runtime
+          decoding routine that generated the flag dynamically from an encoded
+          byte array stored in memory.
+        </p>
+
+        <h3>🧠 Understanding the Decoding Logic</h3>
+
+        <p>
+          Through disassembly of <code>main</code>, we identified a hidden array
+          labeled <code>enc</code> located in the <code>.rodata</code> section.
+          This array was not readable as a meaningful string, indicating it was
+          intentionally obfuscated.
+        </p>
+
+        <p>
+          The decoding mechanism used a simple XOR cipher where each byte of the
+          encoded array was XORed with a repeating key derived from the user’s
+          inputs:
+        </p>
+
+        <code>[1, 3, 3, 7]</code>
+
+        <p>The XOR operation was applied cyclically:</p>
+
+        <code>decoded[i] = enc[i] XOR key[i % 4]</code>
+
+        <h3>⚙️ Identifying the Key in Assembly</h3>
+
+        <p>
+          The following instruction in <code>main</code> confirmed the decoding
+          process:
+        </p>
+
+        <code>xor %edx, %eax</code>
+
+        <p>
+          This showed that each byte from the encoded buffer was being combined
+          with a value loaded from the user input buffer before being printed
+          using <code>putchar()</code>.
+        </p>
+
+        <h3>🧪 Extracting the Encoded Data</h3>
+
+        <p>
+          We extracted the raw encoded bytes directly from memory using GDB:
+        </p>
+
+        <code>x/32bx 0x402008</code>
+
+        <p>
+          This returned the full <code>enc</code> array used for flag
+          generation.
+        </p>
+
+        <h3>🐍 Writing the Decoding Script</h3>
+
+        <p>
+          To reconstruct the flag, we wrote a small Python script to replicate
+          the XOR logic used by the binary:
+        </p>
+
+        <code>
+          enc = [<br />
+          &nbsp;&nbsp;0x47, 0x79, 0x4f, 0x6e, 0x68, 0x76, 0x65, 0x4d,<br />
+          &nbsp;&nbsp;0x42, 0x3b, 0x40, 0x00, 0x00, 0x00<br />
+          ]<br /><br />
+
+          key = [1, 3, 3, 7]<br /><br />
+
+          flag = ''.join(<br />
+          &nbsp;&nbsp;chr(enc[i] ^ key[i % 4])<br />
+          &nbsp;&nbsp;for i in range(len(enc))<br />
+          )<br /><br />
+
+          print(flag)
+        </code>
+
+        <h3>🚀 Final Result</h3>
+
+        <p>
+          Running the script successfully revealed the plaintext flag. This
+          confirmed that the binary was not leaking the flag directly, but
+          constructing it dynamically at runtime using a simple XOR stream
+          cipher.
+        </p>
+
+        <h3>📌 Key Insight</h3>
+
+        <p>
+          This stage demonstrated a common CTF pattern: even when control flow
+          is bypassed, the real challenge often lies in understanding how data
+          is transformed at runtime. In this case, reversing a lightweight XOR
+          obfuscation was required to recover the final flag.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>📌 Key Takeaways</h2>
+        <ul>
+          <li>
+            Binary logic can be intentionally inverted to confuse analysis
+          </li>
+          <li>GDB is powerful for inspecting real execution flow</li>
+          <li>Not all flags are strings — many are runtime-generated</li>
+          <li>XOR is a common lightweight obfuscation method in CTFs</li>
+          <li>Understanding assembly beats guessing inputs</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>🏁 Final Result</h2>
+        <p class="highlight">
+          Successfully reversed, bypassed gates, and decoded XOR-based flag.
+        </p>
+      </div>
+    </div>
+
+    <footer>Built for learning • Cybersecurity CTF Reverse Engineering</footer>
+  </body>
+</html>

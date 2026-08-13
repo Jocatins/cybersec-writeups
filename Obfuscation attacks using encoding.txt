@@ -1,0 +1,16 @@
+Obfuscation attacks using encoding
+Obfuscation via URL encoding
+
+In URLs, a series of reserved characters carry special meaning. For example, an ampersand (&) is used as a delimiter to separate parameters in the query string. The problem is, URL-based inputs may contain these characters for a different reason. Consider a parameter containing a user's search query. What happens if the user searches for something like "Fish & Chips"?
+
+Browsers automatically URL encode any characters that may cause ambiguity for parsers. This usually means substituting them with a % character and their 2-digit hex code as follows:
+[...]/?search=Fish+%26+Chips
+
+This ensures that the ampersand will not be mistaken for a delimiter.
+Note
+
+Although the space character can be encoded as %20, it is often represented by a plus (+) instead, as in the example above.
+
+Any URL-based input is automatically URL decoded server-side before it is assigned to the relevant variables. This means that, as far as most servers are concerned, sequences like %22, %3C, and %3E in a query parameter are synonymous with ", <, and > characters respectively. In other words, you can inject URL-encoded data via the URL and it will usually still be interpreted correctly by the back-end application.
+
+Occasionally, you may find that WAFs and suchlike fail to properly URL decode your input when checking it. In this case, you may be able to smuggle payloads to the back-end application simply by encoding any characters or words that are blacklisted. For example, in a SQL injection attack, you might encode the keywords, so SELECT becomes %53%45%4C%45%43%54 and so on. 

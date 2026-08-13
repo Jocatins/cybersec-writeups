@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL Injection Learning Notes - Understanding ' OR 1=1--</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+            line-height: 1.8;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1000px;
+            margin: 40px auto;
+            background: #fff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0,0,0,.08);
+        }
+
+        h1 {
+            color: #1e3a8a;
+            border-bottom: 3px solid #2563eb;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #0f172a;
+            margin-top: 40px;
+            border-left: 6px solid #2563eb;
+            padding-left: 12px;
+        }
+
+        h3 {
+            color: #2563eb;
+            margin-top: 25px;
+        }
+
+        p {
+            margin: 15px 0;
+        }
+
+        code {
+            background: #eef2ff;
+            color: #c7254e;
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-family: Consolas, monospace;
+        }
+
+        pre {
+            background: #1e293b;
+            color: #f8fafc;
+            padding: 18px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+
+        pre code {
+            background: none;
+            color: inherit;
+            padding: 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 25px 0;
+        }
+
+        table th,
+        table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+
+        table th {
+            background: #2563eb;
+            color: white;
+        }
+
+        table tr:nth-child(even) {
+            background: #f8fafc;
+        }
+
+        blockquote {
+            border-left: 5px solid #2563eb;
+            background: #eff6ff;
+            padding: 12px 18px;
+            margin: 20px 0;
+            font-style: italic;
+        }
+
+        ul li,
+        ol li {
+            margin: 10px 0;
+        }
+
+        .note {
+            background: #fff7ed;
+            border-left: 6px solid #f97316;
+            padding: 18px;
+            margin: 25px 0;
+            border-radius: 6px;
+        }
+
+        .success {
+            background: #ecfdf5;
+            border-left: 6px solid #10b981;
+            padding: 18px;
+            margin: 25px 0;
+            border-radius: 6px;
+        }
+
+        footer {
+            margin-top: 60px;
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>SQL Injection Learning Notes – Understanding <code>' OR 1=1--</code></h1>
+
+<h2>Objective</h2>
+
+<p>
+Today I focused on understanding <strong>why</strong> a SQL injection payload works instead of memorizing payloads.
+The lab contained a SQL Injection vulnerability in the <code>category</code> parameter of a product filter.
+</p>
+
+<p>The original SQL query executed by the application was:</p>
+
+<pre><code>SELECT *
+FROM products
+WHERE category = 'Corporate gifts'
+AND released = 1;</code></pre>
+
+<p>The goal was to retrieve unreleased products.</p>
+
+<hr>
+
+<h2>The Biggest Lesson</h2>
+
+<p>
+The application already has a SQL query.
+</p>
+
+<p>
+<strong>I am NOT writing a brand new SQL query.</strong>
+</p>
+
+<p>
+Instead, I inject my input into an existing query and change its meaning.
+</p>
+
+<p>I can think of the query as a template:</p>
+
+<pre><code>SELECT *
+FROM products
+WHERE category = '[MY INPUT]'
+AND released = 1;</code></pre>
+
+<div class="note">
+<strong>Key Idea:</strong><br>
+My job is to mentally reconstruct the final SQL statement after my input has been inserted.
+</div>
+
+<hr>
+
+<h2>Understanding the Payload</h2>
+
+<p>The successful payload was:</p>
+
+<pre><code>Corporate gifts' OR 1=1--</code></pre>
+
+<p>The application substituted the payload into the query:</p>
+
+<pre><code>SELECT *
+FROM products
+WHERE category = 'Corporate gifts' OR 1=1--'
+AND released = 1;</code></pre>
+
+<h3>Breaking It Down</h3>
+
+<h3><code>Corporate gifts</code></h3>
+
+<p>
+Matches the expected category value.
+</p>
+
+<h3><code>'</code></h3>
+
+<p>
+Closes the original SQL string.
+</p>
+
+<p>
+Before this quote, everything is treated as plain text.
+</p>
+
+<p>
+After this quote, the database starts interpreting my input as SQL.
+</p>
+
+<h3><code>OR</code></h3>
+
+<p>
+Introduces another condition into the WHERE clause.
+</p>
+
+<h3><code>1=1</code></h3>
+
+<p>
+A Boolean expression that is always TRUE.
+</p>
+
+<pre><code>category='Corporate gifts' OR TRUE</code></pre>
+
+<p>
+Since anything OR TRUE evaluates to TRUE, every row satisfies the condition.
+</p>
+
+<h3><code>--</code></h3>
+
+<p>
+Starts a SQL comment.
+Everything after it is ignored by the database.
+</p>
+
+<p>The following part is never executed:</p>
+
+<pre><code>' AND released = 1;</code></pre>
+
+<p>
+This prevents the application's remaining SQL from affecting the query.
+</p>
+
+<hr>
+
+<h2>Why <code>OR 1=1</code> Returns Every Row</h2>
+
+<table>
+
+<tr>
+<th>Product</th>
+<th>Category</th>
+<th>Released</th>
+</tr>
+
+<tr>
+<td>Teddy</td>
+<td>Gifts</td>
+<td>1</td>
+</tr>
+
+<tr>
+<td>Secret Toy</td>
+<td>Gifts</td>
+<td>0</td>
+</tr>
+
+<tr>
+<td>Phone</td>
+<td>Electronics</td>
+<td>1</td>
+</tr>
+
+<tr>
+<td>Prototype</td>
+<td>Electronics</td>
+<td>0</td>
+</tr>
+
+</table>
+
+<p>The WHERE clause becomes:</p>
+
+<pre><code>category='Corporate gifts' OR 1=1</code></pre>
+
+<p>Every row evaluates like this:</p>
+
+<pre><code>FALSE OR TRUE
+TRUE</code></pre>
+
+<div class="success">
+Since <strong>1=1</strong> is always TRUE,
+<strong>every record in the table satisfies the WHERE clause</strong>,
+including unreleased products.
+</div>
+
+<hr>
+
+<h2>Mental Model I Will Use Going Forward</h2>
+
+<p>Instead of asking:</p>
+
+<blockquote>
+"What payload should I use?"
+</blockquote>
+
+<p>I will ask:</p>
+
+<ol>
+
+<li>What SQL query is the application generating?</li>
+
+<li>Which part of the query do I control?</li>
+
+<li>Am I inside a quoted string?</li>
+
+<li>How do I exit the string?</li>
+
+<li>What SQL do I want to inject?</li>
+
+<li>What SQL will the application append afterwards?</li>
+
+<li>Will the appended SQL break my injection?</li>
+
+<li>Do I need to neutralize the remaining SQL using a comment?</li>
+
+<li>What will the final SQL statement look like?</li>
+
+</ol>
+
+<div class="note">
+If I cannot reconstruct the final SQL query on paper,
+I should not send the payload yet.
+</div>
+
+<hr>
+
+<h2>Key Takeaways</h2>
+
+<ul>
+
+<li>SQL Injection is about modifying an existing SQL query—not creating a new one.</li>
+
+<li>Always reconstruct the complete SQL statement before testing.</li>
+
+<li>The single quote (<code>'</code>) changes my role from providing data to writing SQL.</li>
+
+<li><code>OR 1=1</code> is simply an expression that always evaluates to TRUE.</li>
+
+<li><code>--</code> comments out the remainder of the application's SQL query.</li>
+
+<li>Understanding how the SQL parser works is more valuable than memorizing payloads.</li>
+
+<li>Every SQL Injection challenge becomes easier when I think like the database parser.</li>
+
+</ul>
+
+<hr>
+
+<h2>Personal Reflection</h2>
+
+<p>
+Today's lesson completely changed how I think about SQL Injection.
+</p>
+
+<p>
+Previously, I believed successful SQL Injection depended on remembering payloads.
+Now I understand that every payload is simply the result of reasoning about how the application constructs its SQL query.
+</p>
+
+<p>
+Going forward, my focus will be on reconstructing the server's final SQL statement before sending any request. Once I can visualize exactly what the database receives, crafting payloads becomes a logical process instead of a guessing game.
+</p>
+
+<footer>
+Created during my SQL Injection learning journey.<br>
+Learning through reasoning—not memorization.
+</footer>
+
+</div>
+
+</body>
+</html>

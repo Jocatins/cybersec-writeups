@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CSRF Token Validation CTF Writeup</title>
+<style>
+body {font-family: Arial, sans-serif; background:#0f172a; color:#e2e8f0; margin:0; padding:0; line-height:1.6;}
+.container {max-width:1000px; margin:auto; padding:30px;}
+.card {background:#1e293b; padding:25px; border-radius:14px; margin:20px 0; box-shadow:0 4px 15px rgba(0,0,0,.3);}
+h1,h2 {color:#38bdf8;}
+code, pre {background:#020617; color:#93c5fd; padding:10px; border-radius:8px; display:block; overflow:auto;}
+.badge {display:inline-block; padding:8px 14px; background:#16a34a; border-radius:20px; font-weight:bold;}
+.footer {text-align:center; margin-top:40px; color:#94a3b8;}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="card">
+<h1>🏴 CSRF Token Validation - CTF Writeup</h1>
+<p><span class="badge">Flag Captured: zJE3PN^l$XO</span></p>
+<p>This challenge focused on identifying a flaw in how a web application validated CSRF tokens. The application appeared secure at first because requests without a CSRF token were rejected, but deeper testing revealed a parameter pollution vulnerability.</p>
+</div>
+
+<div class="card">
+<h2>🎯 Objective</h2>
+<p>Change the notification email address and exploit the CSRF validation weakness to obtain the secret flag.</p>
+</div>
+
+<div class="card">
+<h2>🔎 Reconnaissance</h2>
+<ul>
+<li>Visited the Employee Portal account page.</li>
+<li>Observed that only email addresses ending with <strong>@victim.com</strong> were accepted.</li>
+<li>Captured the request using browser developer tools.</li>
+</ul>
+
+<pre>
+POST /challenge_45/email/change
+
+email=nicodaemon05@victim.com
+csrf_token=741f3f8980efcc953ea677ee7fb1b424
+</pre>
+</div>
+
+<div class="card">
+<h2>🛠 Moving to Burp Suite</h2>
+<p>The challenge required manipulating requests, making Burp Suite the ideal tool.</p>
+
+<ul>
+<li>Configured Firefox to proxy traffic through Burp.</li>
+<li>Intercepted the email change request.</li>
+<li>Sent the request to Repeater for experimentation.</li>
+</ul>
+</div>
+
+<div class="card">
+<h2>🧪 Testing the CSRF Validation</h2>
+
+<p><strong>Test 1:</strong> Remove the token</p>
+<pre>email=nicodaemon05@victim.com</pre>
+<p>Result: <strong>400 - CSRF token missing or invalid</strong></p>
+
+<p><strong>Test 2:</strong> Use a fake token</p>
+<pre>
+email=nicodaemon05@victim.com
+csrf_token=abc
+</pre>
+<p>Result: <strong>400 - CSRF token missing or invalid</strong></p>
+
+<p><strong>Test 3:</strong> Duplicate CSRF parameters</p>
+
+<pre>
+email=nicodaemon05@victim.com
+csrf_token=741f3f8980efcc953ea677ee7fb1b424
+csrf_token=abc
+</pre>
+
+<p>Result: <strong>302 Redirect</strong></p>
+<p>This indicated a parameter pollution issue where one component validated the first token while another processed the second token.</p>
+</div>
+
+<div class="card">
+<h2>🚩 Obtaining the Flag</h2>
+
+<p>After enabling <strong>Follow Redirections</strong> in Burp Repeater, the redirected response contained the flag:</p>
+
+<pre>zJE3PN^l$XO</pre>
+</div>
+
+<div class="card">
+<h2>🌍 Real-World Relevance</h2>
+<ul>
+<li>Demonstrates why applications must reject duplicate security parameters.</li>
+<li>Shows the dangers of inconsistent request parsing between frameworks and middleware.</li>
+<li>Highlights the importance of testing beyond simple valid/invalid scenarios.</li>
+<li>Reinforces the value of intercepting proxies during web application assessments.</li>
+</ul>
+</div>
+
+<div class="footer">
+<p>Created after successfully completing the CSRF Token Validation challenge 🎉</p>
+</div>
+</div>
+</body>
+</html>

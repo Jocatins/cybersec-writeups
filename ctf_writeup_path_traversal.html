@@ -1,0 +1,215 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); }
+.page { padding: 2rem 0; max-width: 680px; }
+.badge-row { display: flex; gap: 8px; margin-bottom: 2rem; flex-wrap: wrap; }
+.badge { font-size: 11px; font-weight: 500; padding: 4px 10px; border-radius: 20px; letter-spacing: 0.04em; }
+.badge-web { background: #E6F1FB; color: #0C447C; }
+.badge-beginner { background: #EAF3DE; color: #27500A; }
+.badge-solved { background: #E1F5EE; color: #085041; }
+.hero { margin-bottom: 2.5rem; padding-bottom: 2rem; border-bottom: 0.5px solid var(--color-border-tertiary); }
+.hero-label { font-size: 11px; color: var(--color-text-tertiary); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+h1.title { font-size: 26px; font-weight: 500; color: var(--color-text-primary); line-height: 1.3; margin-bottom: 0.75rem; }
+.hero-meta { font-size: 13px; color: var(--color-text-secondary); }
+.hero-meta span { margin-right: 1.5rem; }
+.toc { background: var(--color-background-secondary); border-radius: var(--border-radius-lg); padding: 1rem 1.25rem; margin-bottom: 2rem; border: 0.5px solid var(--color-border-tertiary); }
+.toc-title { font-size: 11px; font-weight: 500; color: var(--color-text-tertiary); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 0.75rem; }
+.toc-items { display: flex; flex-direction: column; gap: 4px; }
+.toc-item { font-size: 13px; color: var(--color-text-secondary); cursor: pointer; padding: 2px 0; display: flex; align-items: center; gap: 8px; text-decoration: none; }
+.toc-item:hover { color: var(--color-text-primary); }
+.toc-num { font-size: 11px; color: var(--color-text-tertiary); min-width: 18px; font-variant-numeric: tabular-nums; }
+.section { margin-bottom: 2.5rem; }
+.section-eyebrow { font-size: 11px; font-weight: 500; color: var(--color-text-tertiary); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.4rem; }
+h2.section-title { font-size: 17px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 0.9rem; padding-bottom: 0.6rem; border-bottom: 0.5px solid var(--color-border-tertiary); }
+p.body { font-size: 14px; color: var(--color-text-secondary); line-height: 1.75; margin-bottom: 0.75rem; }
+.terminal { background: #1a1a1e; border-radius: var(--border-radius-lg); padding: 1rem 1.25rem; margin: 1rem 0; overflow-x: auto; border: 0.5px solid #333; }
+.term-bar { display: flex; gap: 6px; margin-bottom: 12px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; }
+.dot-r { background: #FF5F57; }
+.dot-y { background: #FFBD2E; }
+.dot-g { background: #28CA40; }
+.term-code { font-family: var(--font-mono); font-size: 13px; color: #e2e8f0; line-height: 1.7; white-space: pre; }
+.term-code .comment { color: #64748b; }
+.term-code .path { color: #7dd3fc; }
+.term-code .param { color: #f9a8d4; }
+.term-code .value { color: #86efac; }
+.term-code .keyword { color: #fbbf24; }
+.highlight-box { border-left: 2.5px solid #378ADD; background: var(--color-background-secondary); border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0; padding: 0.9rem 1.1rem; margin: 1rem 0; }
+.highlight-box p { font-size: 13.5px; color: var(--color-text-secondary); line-height: 1.7; }
+.highlight-box .hl-label { font-size: 11px; font-weight: 500; color: #185FA5; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 0.35rem; }
+.impact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin: 1rem 0; }
+.impact-card { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 0.75rem 1rem; border: 0.5px solid var(--color-border-tertiary); }
+.impact-card i { font-size: 18px; color: var(--color-text-tertiary); margin-bottom: 6px; display: block; }
+.impact-card p { font-size: 12px; color: var(--color-text-secondary); }
+.remedy-list { display: flex; flex-direction: column; gap: 10px; margin-top: 0.75rem; }
+.remedy-item { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 0.75rem 1rem; border: 0.5px solid var(--color-border-tertiary); display: flex; gap: 12px; align-items: flex-start; }
+.remedy-num { font-size: 11px; font-weight: 500; color: #185FA5; background: #E6F1FB; border-radius: 4px; padding: 2px 7px; flex-shrink: 0; margin-top: 1px; }
+.remedy-item p { font-size: 13px; color: var(--color-text-secondary); line-height: 1.6; }
+.remedy-item strong { color: var(--color-text-primary); font-weight: 500; }
+.flag-box { border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1.25rem 1.5rem; background: var(--color-background-primary); display: flex; align-items: center; gap: 1rem; margin-top: 1rem; }
+.flag-icon { width: 40px; height: 40px; border-radius: var(--border-radius-md); background: #EAF3DE; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.flag-icon i { font-size: 20px; color: #27500A; }
+.flag-text h3 { font-size: 14px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 2px; }
+.flag-text p { font-size: 12px; color: var(--color-text-secondary); }
+.vuln-pill { display: inline-flex; align-items: center; gap: 5px; background: #FCEBEB; color: #791F1F; border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 500; margin: 0.5rem 0.5rem 0 0; }
+.divider { border: none; border-top: 0.5px solid var(--color-border-tertiary); margin: 2rem 0; }
+</style>
+
+<div class="page">
+  <h2 class="sr-only">CTF Write-Up: The Wandering Document — Path Traversal vulnerability explained</h2>
+
+  <div class="badge-row">
+    <span class="badge badge-web"><i class="ti ti-world" aria-hidden="true"></i> Web security</span>
+    <span class="badge badge-beginner"><i class="ti ti-seedling" aria-hidden="true"></i> Beginner</span>
+    <span class="badge badge-solved"><i class="ti ti-circle-check" aria-hidden="true"></i> Solved</span>
+  </div>
+
+  <div class="hero">
+    <div class="hero-label">CTF Write-Up</div>
+    <h1 class="title">The Wandering Document</h1>
+    <div class="hero-meta">
+      <span><i class="ti ti-shield-lock" style="font-size:14px;vertical-align:-2px;margin-right:4px" aria-hidden="true"></i>Path traversal</span>
+      <span><i class="ti ti-link" style="font-size:14px;vertical-align:-2px;margin-right:4px" aria-hidden="true"></i>challenge.razzify.in</span>
+    </div>
+  </div>
+
+  <div class="toc">
+    <div class="toc-title">Contents</div>
+    <div class="toc-items">
+      <span class="toc-item"><span class="toc-num">01</span> Challenge overview</span>
+      <span class="toc-item"><span class="toc-num">02</span> Initial reconnaissance</span>
+      <span class="toc-item"><span class="toc-num">03</span> Understanding path traversal</span>
+      <span class="toc-item"><span class="toc-num">04</span> Exploitation process</span>
+      <span class="toc-item"><span class="toc-num">05</span> Root cause analysis</span>
+      <span class="toc-item"><span class="toc-num">06</span> Security impact</span>
+      <span class="toc-item"><span class="toc-num">07</span> Remediation</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-eyebrow">01 — Overview</div>
+    <h2 class="section-title">Challenge overview</h2>
+    <p class="body">An Online Documentation Viewer allowed users to read technical documentation files stored on the server. The application loaded documents based on a URL parameter called <code>doc</code>.</p>
+    <div class="terminal">
+      <div class="term-bar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+      <div class="term-code"><span class="comment"># Example URLs</span>
+<span class="path">https://challenge.razzify.in/challenge_12/view</span>?<span class="param">doc</span>=<span class="value">api-reference.md</span>
+<span class="path">https://challenge.razzify.in/challenge_12/view</span>?<span class="param">doc</span>=<span class="value">create-order.md</span></div>
+    </div>
+    <p class="body">The objective was to locate and retrieve a hidden file named <code>flag.txt</code>. The challenge description hinted that the file loading mechanism might not properly restrict access to files outside the intended documentation directory.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-eyebrow">02 — Recon</div>
+    <h2 class="section-title">Initial reconnaissance</h2>
+    <p class="body">The URL structure immediately revealed that the document being displayed was controlled entirely by the <code>doc</code> parameter. The challenge hints reinforced this:</p>
+    <div class="highlight-box">
+      <div class="hl-label">Hints provided</div>
+      <p>Observe the URL parameters · The <code>doc</code> parameter may be vulnerable · The flag is stored inside <code>flag.txt</code></p>
+    </div>
+    <p class="body">These clues pointed squarely toward a path traversal vulnerability — the backend was reading files from a directory and displaying their contents without sanitizing the input.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-eyebrow">03 — Concept</div>
+    <h2 class="section-title">Understanding path traversal</h2>
+    <p class="body">Path traversal occurs when an application accepts file paths from user input without proper validation. Developers typically expect access to files like these:</p>
+    <div class="terminal">
+      <div class="term-bar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+      <div class="term-code">docs/<span class="value">api-reference.md</span>
+docs/<span class="value">create-order.md</span></div>
+    </div>
+    <p class="body">However, an attacker can use <code>../</code> sequences to move up directory levels. The operating system faithfully resolves these, stepping out of the intended directory entirely:</p>
+    <div class="terminal">
+      <div class="term-bar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+      <div class="term-code">docs/<span class="keyword">../../</span><span class="value">flag.txt</span>   <span class="comment"># traverses up two levels</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-eyebrow">04 — Exploit</div>
+    <h2 class="section-title">Exploitation process</h2>
+    <p class="body">After identifying the likely vulnerability, the <code>doc</code> parameter was modified to escape the documentation directory using traversal sequences.</p>
+    <div class="terminal">
+      <div class="term-bar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+      <div class="term-code"><span class="comment"># Payload</span>
+<span class="param">doc</span>=<span class="keyword">../../</span><span class="value">flag.txt</span>
+
+<span class="comment"># Full URL</span>
+<span class="path">https://challenge.razzify.in/challenge_12/view</span>?<span class="param">doc</span>=<span class="keyword">../../</span><span class="value">flag.txt</span></div>
+    </div>
+    <div class="highlight-box">
+      <div class="hl-label">Result</div>
+      <p>The application returned the contents of <code>flag.txt</code>, confirming the path traversal vulnerability. No authentication bypass was needed — just a modified URL parameter.</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-eyebrow">05 — Root cause</div>
+    <h2 class="section-title">Root cause analysis</h2>
+    <p class="body">The vulnerability existed because the application trusted user input when constructing file paths. A simplified version of the vulnerable code would look like this:</p>
+    <div class="terminal">
+      <div class="term-bar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+      <div class="term-code"><span class="keyword">doc</span> = request.args.get(<span class="value">"doc"</span>)
+open(<span class="value">"docs/"</span> + <span class="keyword">doc</span>)   <span class="comment"># ← never do this</span></div>
+    </div>
+    <p class="body">The application did not validate or sanitize the input, allowing traversal sequences to be interpreted by the OS directly.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-eyebrow">06 — Impact</div>
+    <h2 class="section-title">Security impact</h2>
+    <p class="body">In a real-world application, an attacker could access any file the web process has permission to read. Common targets include:</p>
+    <div class="impact-grid">
+      <div class="impact-card"><i class="ti ti-file-dots" aria-hidden="true"></i><p>Config files</p></div>
+      <div class="impact-card"><i class="ti ti-code" aria-hidden="true"></i><p>Source code</p></div>
+      <div class="impact-card"><i class="ti ti-key" aria-hidden="true"></i><p>API keys &amp; secrets</p></div>
+      <div class="impact-card"><i class="ti ti-database" aria-hidden="true"></i><p>DB credentials</p></div>
+      <div class="impact-card"><i class="ti ti-users" aria-hidden="true"></i><p>User data</p></div>
+      <div class="impact-card"><i class="ti ti-server" aria-hidden="true"></i><p>Server info</p></div>
+    </div>
+    <div class="terminal" style="margin-top:1rem">
+      <div class="term-bar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+      <div class="term-code"><span class="comment"># Commonly targeted files</span>
+<span class="value">/etc/passwd</span>
+<span class="value">.env</span>
+<span class="value">web.config</span>
+<span class="value">application.properties</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-eyebrow">07 — Remediation</div>
+    <h2 class="section-title">Remediation techniques</h2>
+    <div class="remedy-list">
+      <div class="remedy-item">
+        <span class="remedy-num">01</span>
+        <p><strong>Input allowlist</strong> — Only permit known, explicitly allowed filenames. Reject everything else before touching the filesystem.</p>
+      </div>
+      <div class="remedy-item">
+        <span class="remedy-num">02</span>
+        <p><strong>Canonical path check</strong> — Resolve the absolute path with <code>os.path.realpath()</code> and verify it starts with the intended base directory.</p>
+      </div>
+      <div class="remedy-item">
+        <span class="remedy-num">03</span>
+        <p><strong>Strip traversal sequences</strong> — Reject inputs containing <code>../</code> or <code>..\</code> before any path construction.</p>
+      </div>
+      <div class="remedy-item">
+        <span class="remedy-num">04</span>
+        <p><strong>Use file identifiers</strong> — Accept an opaque <code>?id=1</code> parameter that maps to a predefined file server-side, with no path logic exposed to the user.</p>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="flag-box">
+    <div class="flag-icon"><i class="ti ti-flag-3" aria-hidden="true"></i></div>
+    <div class="flag-text">
+      <h3>Flag retrieved — challenge solved</h3>
+      <p>Accessed via <code>../../flag.txt</code> · Vulnerability type: <span style="color:#791F1F;font-weight:500">path traversal</span> · Category: web security</p>
+    </div>
+  </div>
+
+</div>

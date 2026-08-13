@@ -1,0 +1,65 @@
+Symbolic Decimals – CTF Write-Up
+
+## Objective
+
+Decode a message hidden using keyboard symbols that represent decimal numbers, then convert those decimal values into ASCII characters to recover the flag.
+
+## Steps Taken
+
+### 1. Analyze the Hint
+
+The challenge description provided the mapping between symbols and digits based on the top row of a keyboard:
+
+! = 1, @ = 2, # = 3, $ = 4, % = 5, ^ = 6, & = 7, * = 8, ( = 9, ) = 0
+
+Encoded message:
+
+!)%,&),*#,&(,%%,!!^,%$,^&,!@!
+
+### 2. Convert Symbols to Decimal Numbers
+
+Each comma-separated group was translated using the symbol-to-digit mapping:
+
+!)% → 105
+&) → 70
+*# → 83
+&( → 79
+%% → 55
+!!^ → 116
+%$ → 54
+^& → 67
+!@! → 121
+
+Result:
+
+105,70,83,79,55,116,54,67,121
+
+### 3. Convert Decimal Values to ASCII
+
+Each decimal value was converted to its ASCII equivalent:
+
+105 → i
+70 → F
+83 → S
+79 → O
+55 → 7
+116 → t
+54 → 6
+67 → C
+121 → y
+
+Recovered flag:
+
+iFSO7t6Cy
+
+## Key Takeaways
+
+* Symbols on the keyboard can be used as an alternative representation of numbers.
+* Comma-separated values often indicate individual encoded units that should be decoded separately.
+* Decimal-to-ASCII conversion is a common CTF encoding technique.
+* Always pay close attention to challenge hints; they often reveal the intended decoding method.
+* Start with the simplest interpretation before assuming additional layers of encoding or hidden files.
+
+## Flag
+
+iFSO7t6Cy

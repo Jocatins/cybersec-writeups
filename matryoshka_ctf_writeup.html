@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Matryoshka Files CTF Writeup</title>
+<style>
+body {font-family: Arial, sans-serif; margin:40px; line-height:1.6; background:#f4f6f9;}
+.container {max-width:900px; margin:auto; background:white; padding:30px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.15);}
+h1,h2 {color:#1f4e79;}
+code, pre {background:#eef2f7; padding:4px 6px; border-radius:4px;}
+pre {padding:12px; overflow-x:auto;}
+.card {background:#fafcff; border-left:5px solid #1f4e79; padding:15px; margin:15px 0;}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>The Matryoshka Files – CTF Forensics Write‑up</h1>
+<p><strong>Recovered Flag:</strong> <code>mSJx5tmSzHP3</code></p>
+
+<h2>The Thought Process</h2>
+<div class="card">
+The challenge title referenced Russian Matryoshka dolls, suggesting nested content hidden inside other content.
+The hints mentioned file size mismatches and multiple file signatures, which pointed toward file carving and embedded data rather than image steganography.
+</div>
+
+<h2>Step 1 – Verify the file type</h2>
+<pre>file challenge.jpg</pre>
+<p>This confirmed that the file was a normal JPEG image. Attackers often append hidden content to otherwise legitimate files.</p>
+
+<h2>Step 2 – Examine metadata</h2>
+<pre>exiftool challenge.jpg</pre>
+<p>No suspicious metadata or comments were found, so attention shifted toward hidden binary content.</p>
+
+<h2>Step 3 – Search for embedded files</h2>
+<pre>binwalk challenge.jpg</pre>
+<p>Binwalk detected a ZIP archive hidden at byte offset <code>1199138</code> containing <code>flag.txt</code>.</p>
+
+<h2>Step 4 – Carve the hidden archive</h2>
+<pre>dd if=challenge.jpg of=embedded.zip bs=1 skip=1199138</pre>
+<p>The <code>dd</code> command copied everything after the ZIP signature into a standalone archive.</p>
+
+<h2>Step 5 – Validate and extract</h2>
+<pre>file embedded.zip
+unzip embedded.zip
+cat flag.txt</pre>
+<p>The archive extracted successfully and revealed the final flag.</p>
+
+<h2>Why This Approach Worked</h2>
+<ul>
+<li>The challenge hints suggested hidden layers rather than visible clues.</li>
+<li>JPEG files can legally contain appended data without breaking image rendering.</li>
+<li>Binwalk excels at locating known file signatures embedded in other files.</li>
+<li>Manual carving with <code>dd</code> is reliable when automatic extraction fails.</li>
+</ul>
+
+<h2>Real‑World Applications</h2>
+<ul>
+<li>Digital forensic investigations involving data exfiltration.</li>
+<li>Malware analysis where payloads are hidden inside images or documents.</li>
+<li>Detection of covert communication channels.</li>
+<li>Incident response and insider threat investigations.</li>
+<li>Validation of suspicious email attachments and downloaded files.</li>
+</ul>
+
+<h2>Key Lessons</h2>
+<ul>
+<li>Never trust file extensions alone.</li>
+<li>Use multiple forensic tools because each reveals different artifacts.</li>
+<li>When automatic extraction fails, manual carving techniques remain valuable.</li>
+<li>Challenge names and hints often reveal the intended investigative direction.</li>
+</ul>
+</div>
+</body>
+</html>

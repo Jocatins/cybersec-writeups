@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>CTF Write-up - Header Hijack</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f4f7fb;color:#222;max-width:900px;margin:auto;padding:30px}
+h1,h2{color:#174ea6}code,pre{background:#eef;padding:2px 4px;border-radius:4px}
+pre{padding:12px;overflow:auto}
+.box{background:#fff;border-left:5px solid #174ea6;padding:16px;margin:18px 0;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+</style></head><body>
+<h1>Header Hijack – CTF Write-up</h1>
+
+<div class="box">
+<h2>Challenge Summary</h2>
+<p>The objective was to access an administrator page that returned <b>Access Denied</b>. The hint suggested inspecting the request and modifying HTTP headers using Burp Suite.</p>
+</div>
+
+<div class="box">
+<h2>Our Investigation</h2>
+<ol>
+<li>Created an account and logged in.</li>
+<li>Intercepted the request to the admin page with Burp Suite.</li>
+<li>Observed the HTML response contained a hidden developer comment:
+<pre>&lt;!-- Tip: Check the request headers for the admin access key. --&gt;</pre>
+</li>
+<li>Reviewed the HTML and noticed it loaded:
+<pre>/challenge_7/js/admin.js</pre>
+</li>
+<li>Opened the JavaScript file directly in the browser.</li>
+<li>The JavaScript revealed the information required for the challenge, ultimately leading to the flag.</li>
+</ol>
+</div>
+
+<div class="box">
+<h2>Why Inspect <code>admin.js</code>?</h2>
+<p>Modern web applications place much of their logic in JavaScript. Whenever an HTML page loads a script related to authentication, administration, or API calls, that file becomes a high-value target.</p>
+<ul>
+<li>JavaScript frequently contains API endpoints.</li>
+<li>Developers sometimes hardcode custom header names.</li>
+<li>Configuration values, feature flags, tokens, or test secrets may be accidentally exposed.</li>
+<li>The code often shows exactly how requests are constructed.</li>
+</ul>
+</div>
+
+<div class="box">
+<h2>General Methodology for Similar Challenges</h2>
+<ul>
+<li>Inspect every request and response.</li>
+<li>Read HTML comments—they often contain clues.</li>
+<li>Open every linked JavaScript file.</li>
+<li>Search JavaScript for terms such as <code>fetch</code>, <code>headers</code>, <code>X-</code>, <code>Authorization</code>, <code>token</code>, <code>admin</code>, <code>secret</code>, and <code>key</code>.</li>
+<li>Use Burp Repeater to modify requests and compare responses.</li>
+<li>Never assume client-side code is harmless; treat it as documentation of the application's behavior.</li>
+</ul>
+</div>
+
+<div class="box">
+<h2>Real-World Applications</h2>
+<ul>
+<li><b>Penetration Testing:</b> Identify exposed API keys, debug endpoints, or insecure authorization checks.</li>
+<li><b>Bug Bounty Hunting:</b> Discover information leakage through JavaScript bundles.</li>
+<li><b>Secure Code Reviews:</b> Verify sensitive data is never shipped to browsers.</li>
+<li><b>Incident Response:</b> Understand how a compromised web application communicates with backend APIs.</li>
+<li><b>Web Development:</b> Learn why secrets must remain on the server and why authorization should never rely solely on client-controlled headers.</li>
+</ul>
+</div>
+
+<div class="box">
+<h2>Key Takeaways</h2>
+<ul>
+<li>Follow the clues left by the application.</li>
+<li>Inspect JavaScript whenever a page loads it.</li>
+<li>Understand that HTTP headers are user-controlled unless validated server-side.</li>
+<li>Small observations, such as HTML comments, often unlock an entire challenge.</li>
+</ul>
+</div>
+</body></html>

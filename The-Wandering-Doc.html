@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CTF Write-Up: The Wandering Document</title>
+<style>
+  :root {
+    --ms-blue: #0078d4;
+    --ms-blue-dark: #005a9e;
+    --ms-blue-light: #deecf9;
+    --ms-blue-faint: #f0f6fd;
+    --ms-gray-50: #faf9f8;
+    --ms-gray-100: #f3f2f1;
+    --ms-gray-200: #edebe9;
+    --ms-gray-400: #a19f9d;
+    --ms-gray-600: #605e5c;
+    --ms-gray-800: #323130;
+    --ms-gray-900: #201f1e;
+    --ms-red: #d13438;
+    --ms-orange: #ca5010;
+    --ms-green: #107c10;
+    --ms-yellow: #ffb900;
+    --ms-sidebar: 260px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--ms-gray-900);
+    background: #fff;
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: var(--ms-sidebar);
+    background: var(--ms-gray-50);
+    border-right: 1px solid var(--ms-gray-200);
+    padding: 24px 0;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+
+  .sidebar-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 20px 20px;
+    border-bottom: 1px solid var(--ms-gray-200);
+    margin-bottom: 16px;
+  }
+
+  .sidebar-logo svg { flex-shrink: 0; }
+
+  .sidebar-logo-text {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ms-gray-800);
+    line-height: 1.3;
+  }
+
+  .sidebar-logo-sub {
+    font-size: 11px;
+    color: var(--ms-gray-400);
+    font-weight: 400;
+  }
+
+  .sidebar-section-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ms-gray-400);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0 20px 8px;
+    margin-top: 12px;
+  }
+
+  .sidebar-nav a {
+    display: block;
+    padding: 7px 20px;
+    font-size: 13px;
+    color: var(--ms-gray-600);
+    text-decoration: none;
+    border-left: 3px solid transparent;
+    transition: background 0.1s, color 0.1s;
+  }
+
+  .sidebar-nav a:hover {
+    background: var(--ms-gray-100);
+    color: var(--ms-gray-900);
+  }
+
+  .sidebar-nav a.active {
+    border-left-color: var(--ms-blue);
+    background: var(--ms-blue-faint);
+    color: var(--ms-blue);
+    font-weight: 600;
+  }
+
+  .sidebar-nav a.sub {
+    padding-left: 36px;
+    font-size: 12.5px;
+  }
+
+  /* Top bar */
+  .topbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 48px;
+    background: var(--ms-blue);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 16px;
+    z-index: 100;
+  }
+
+  .topbar-title {
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    flex: 1;
+  }
+
+  .topbar-breadcrumb {
+    color: rgba(255,255,255,0.75);
+    font-size: 13px;
+  }
+
+  .topbar-breadcrumb span { color: #fff; }
+
+  /* Main content */
+  .main {
+    margin-left: var(--ms-sidebar);
+    margin-top: 48px;
+    flex: 1;
+    max-width: 900px;
+    padding: 40px 48px 80px;
+  }
+
+  /* Article header */
+  .article-header {
+    border-bottom: 1px solid var(--ms-gray-200);
+    padding-bottom: 24px;
+    margin-bottom: 32px;
+  }
+
+  .article-tags {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+
+  .tag {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .tag-web { background: #dff6dd; color: #107c10; }
+  .tag-beginner { background: var(--ms-blue-light); color: var(--ms-blue-dark); }
+  .tag-solved { background: #fde7e9; color: var(--ms-red); }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--ms-gray-900);
+    line-height: 1.3;
+    margin-bottom: 12px;
+  }
+
+  .article-meta {
+    font-size: 13px;
+    color: var(--ms-gray-400);
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .article-meta strong { color: var(--ms-gray-600); }
+
+  /* Callout boxes */
+  .callout {
+    border-left: 4px solid;
+    border-radius: 0 4px 4px 0;
+    padding: 14px 18px;
+    margin: 24px 0;
+    font-size: 14px;
+  }
+
+  .callout-info {
+    border-color: var(--ms-blue);
+    background: var(--ms-blue-faint);
+    color: var(--ms-blue-dark);
+  }
+
+  .callout-warning {
+    border-color: var(--ms-yellow);
+    background: #fffbf0;
+    color: #7a5400;
+  }
+
+  .callout-danger {
+    border-color: var(--ms-red);
+    background: #fde7e9;
+    color: #8b0000;
+  }
+
+  .callout-success {
+    border-color: var(--ms-green);
+    background: #dff6dd;
+    color: #004b00;
+  }
+
+  .callout-title {
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .callout-icon {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 900;
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .callout-info .callout-icon { background: var(--ms-blue); }
+  .callout-warning .callout-icon { background: var(--ms-yellow); color: #333; }
+  .callout-danger .callout-icon { background: var(--ms-red); }
+  .callout-success .callout-icon { background: var(--ms-green); }
+
+  /* Headings */
+  h2 {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--ms-gray-900);
+    margin: 40px 0 12px;
+    padding-top: 8px;
+    border-top: 1px solid var(--ms-gray-200);
+  }
+
+  h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--ms-gray-800);
+    margin: 28px 0 10px;
+  }
+
+  p { margin-bottom: 14px; color: var(--ms-gray-800); }
+
+  /* Code blocks */
+  pre {
+    background: var(--ms-gray-900);
+    border-radius: 4px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    overflow-x: auto;
+    position: relative;
+  }
+
+  pre code {
+    font-family: 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #d4d4d4;
+    background: none;
+    padding: 0;
+    border-radius: 0;
+  }
+
+  code {
+    font-family: 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+    font-size: 13px;
+    background: var(--ms-gray-100);
+    border: 1px solid var(--ms-gray-200);
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: var(--ms-orange);
+  }
+
+  .code-label {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #888;
+    margin-bottom: 4px;
+  }
+
+  /* Syntax highlight */
+  .kw { color: #569cd6; }
+  .str { color: #ce9178; }
+  .cmt { color: #6a9955; }
+  .fn { color: #dcdcaa; }
+  .url { color: #4ec9b0; }
+  .num { color: #b5cea8; }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 14px;
+  }
+
+  th {
+    background: var(--ms-gray-100);
+    text-align: left;
+    padding: 10px 14px;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--ms-gray-800);
+    border-bottom: 2px solid var(--ms-gray-200);
+  }
+
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--ms-gray-200);
+    color: var(--ms-gray-800);
+    vertical-align: top;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:nth-child(even) td { background: var(--ms-gray-50); }
+
+  /* Step list */
+  .steps { list-style: none; margin: 16px 0; }
+  .steps li {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--ms-gray-200);
+  }
+  .steps li:last-child { border-bottom: none; }
+
+  .step-num {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--ms-blue);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .step-content { flex: 1; }
+  .step-title { font-weight: 600; font-size: 14px; color: var(--ms-gray-900); margin-bottom: 4px; }
+  .step-desc { font-size: 13.5px; color: var(--ms-gray-600); line-height: 1.6; }
+
+  /* Impact grid */
+  .impact-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+    margin: 20px 0;
+  }
+
+  .impact-item {
+    background: var(--ms-gray-50);
+    border: 1px solid var(--ms-gray-200);
+    border-radius: 4px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13.5px;
+    color: var(--ms-gray-800);
+    font-weight: 500;
+  }
+
+  .impact-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--ms-red);
+    flex-shrink: 0;
+  }
+
+  /* Remediation cards */
+  .remed-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+    margin: 20px 0;
+  }
+
+  .remed-card {
+    border: 1px solid var(--ms-gray-200);
+    border-radius: 4px;
+    padding: 16px;
+    background: #fff;
+  }
+
+  .remed-num {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ms-blue);
+    margin-bottom: 8px;
+  }
+
+  .remed-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ms-gray-900);
+    margin-bottom: 8px;
+  }
+
+  .remed-desc {
+    font-size: 12.5px;
+    color: var(--ms-gray-600);
+    line-height: 1.55;
+  }
+
+  /* Summary strip */
+  .summary-strip {
+    background: var(--ms-blue);
+    color: #fff;
+    border-radius: 4px;
+    padding: 16px 20px;
+    margin: 32px 0 0;
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+
+  .summary-item { }
+  .summary-label { font-size: 11px; opacity: 0.75; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 4px; }
+  .summary-value { font-size: 15px; font-weight: 600; }
+
+  ul { padding-left: 20px; margin-bottom: 14px; }
+  ul li { color: var(--ms-gray-800); margin-bottom: 6px; font-size: 14.5px; }
+
+  /* Scrollbar */
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--ms-gray-200); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <span class="topbar-title">CTF Documentation</span>
+  <span class="topbar-breadcrumb">Web Security › <span>Path Traversal</span></span>
+</div>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+      <rect width="13" height="13" fill="#f25022"/>
+      <rect x="15" width="13" height="13" fill="#7fba00"/>
+      <rect y="15" width="13" height="13" fill="#00a4ef"/>
+      <rect x="15" y="15" width="13" height="13" fill="#ffb900"/>
+    </svg>
+    <div>
+      <div class="sidebar-logo-text">CTF Write-Ups</div>
+      <div class="sidebar-logo-sub">Security Research</div>
+    </div>
+  </div>
+
+  <div class="sidebar-section-label">This Article</div>
+  <div class="sidebar-nav">
+    <a href="#overview" class="active">Overview</a>
+    <a href="#recon" class="sub">Reconnaissance</a>
+    <a href="#traversal" class="sub">Path Traversal</a>
+    <a href="#exploit" class="sub">Exploitation</a>
+    <a href="#root-cause" class="sub">Root Cause</a>
+    <a href="#impact" class="sub">Security Impact</a>
+    <a href="#remediation" class="sub">Remediation</a>
+  </div>
+
+  <div class="sidebar-section-label" style="margin-top:24px;">Related Topics</div>
+  <div class="sidebar-nav">
+    <a href="#" style="font-size:13px;">SQL Injection</a>
+    <a href="#" style="font-size:13px;">File Inclusion (LFI)</a>
+    <a href="#" style="font-size:13px;">SSRF Attacks</a>
+    <a href="#" style="font-size:13px;">OWASP Top 10</a>
+  </div>
+</nav>
+
+<!-- Main content -->
+<main class="main">
+
+  <div class="article-header" id="overview">
+    <div class="article-tags">
+      <span class="tag tag-web">Web Security</span>
+      <span class="tag tag-beginner">Beginner</span>
+      <span class="tag tag-solved">✓ Solved</span>
+    </div>
+    <h1>The Wandering Document</h1>
+    <div class="article-meta">
+      <span><strong>Challenge</strong> challenge_12</span>
+      <span><strong>Vulnerability</strong> Path Traversal (CWE-22)</span>
+      <span><strong>Platform</strong> challenge.razzify.in</span>
+      <span><strong>Category</strong> CTF / Web</span>
+    </div>
+  </div>
+
+  <div class="callout callout-info">
+    <div class="callout-title">
+      <span class="callout-icon">i</span>
+      Challenge Summary
+    </div>
+    An online documentation viewer loaded files via a <code>doc</code> URL parameter without sanitizing path traversal sequences, allowing arbitrary file reads outside the intended directory.
+  </div>
+
+  <p>This write-up covers the discovery and exploitation of a <strong>Path Traversal</strong> vulnerability in a web-based documentation viewer. The application served Markdown files from a server directory through a URL parameter — and failed to restrict access to only that directory.</p>
+
+  <p><strong>Objective:</strong> Locate and read a hidden file named <code>flag.txt</code> on the server.</p>
+
+  <h2 id="recon">Initial Reconnaissance</h2>
+
+  <p>The application served documentation through a <code>doc</code> query parameter in the URL:</p>
+
+  <div class="code-label">Example URLs</div>
+  <pre><code><span class="url">https://challenge.razzify.in/challenge_12/view?doc=api-reference.md</span>
+<span class="url">https://challenge.razzify.in/challenge_12/view?doc=create-order.md</span></code></pre>
+
+  <p>The direct exposure of a filename in the URL immediately suggested that the backend was constructing a file path from user input — a classic signal for path traversal. The challenge hints confirmed:</p>
+
+  <ul>
+    <li>The <code>doc</code> parameter controls which file is loaded.</li>
+    <li>The parameter may be vulnerable to traversal sequences.</li>
+    <li>The flag is stored in <code>flag.txt</code> at an unknown location above the docs folder.</li>
+  </ul>
+
+  <h2 id="traversal">Understanding Path Traversal</h2>
+
+  <p>Path Traversal occurs when an application accepts file paths from user input without proper validation. By inserting <code>../</code> sequences — which instruct the OS to move up one directory — an attacker can escape the intended directory and access arbitrary files.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Intended path</th>
+        <th>Traversal payload</th>
+        <th>Resolved path</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>docs/api-reference.md</code></td>
+        <td><code>api-reference.md</code></td>
+        <td><code>/app/docs/api-reference.md</code></td>
+      </tr>
+      <tr>
+        <td>One level up</td>
+        <td><code>../config.json</code></td>
+        <td><code>/app/config.json</code></td>
+      </tr>
+      <tr>
+        <td>Two levels up</td>
+        <td><code>../../flag.txt</code></td>
+        <td><code>/flag.txt</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-warning">
+    <div class="callout-title">
+      <span class="callout-icon">!</span>
+      Why This Works
+    </div>
+    The operating system resolves <code>../</code> at the filesystem level before the application can check what file is being requested. If the app doesn't strip or validate these sequences before constructing the path, the OS does exactly what the attacker intends.
+  </div>
+
+  <h2 id="exploit">Exploitation</h2>
+
+  <p>With the vulnerability identified, exploitation was straightforward. The <code>doc</code> parameter was modified to include traversal sequences pointing to <code>flag.txt</code>:</p>
+
+  <div class="code-label">Payload</div>
+  <pre><code>../../flag.txt</code></pre>
+
+  <div class="code-label">Full Request URL</div>
+  <pre><code><span class="url">https://challenge.razzify.in/challenge_12/view?doc=../../flag.txt</span></code></pre>
+
+  <p>The server returned the contents of <code>flag.txt</code> without any error or authentication check, confirming the vulnerability and yielding the flag.</p>
+
+  <div class="callout callout-success">
+    <div class="callout-title">
+      <span class="callout-icon">✓</span>
+      Flag Retrieved
+    </div>
+    The traversal payload successfully escaped the <code>docs/</code> directory and read <code>flag.txt</code> from a parent directory. Challenge status: <strong>Solved</strong>.
+  </div>
+
+  <h2 id="root-cause">Root Cause Analysis</h2>
+
+  <p>The vulnerability existed because the application concatenated user input directly into a file path with no validation:</p>
+
+  <div class="code-label">Vulnerable Implementation (Python)</div>
+  <pre><code><span class="kw">doc</span> = request.args.get(<span class="str">"doc"</span>)
+<span class="fn">open</span>(<span class="str">"docs/"</span> + doc)  <span class="cmt"># No validation — user controls the full path</span></code></pre>
+
+  <p>A safe version would resolve the full canonical path and verify it remains inside the allowed directory before opening the file:</p>
+
+  <div class="code-label">Secure Implementation (Python)</div>
+  <pre><code><span class="kw">import</span> os
+
+BASE_DIR = os.path.abspath(<span class="str">"docs/"</span>)
+doc      = request.args.get(<span class="str">"doc"</span>)
+full     = os.path.realpath(os.path.join(BASE_DIR, doc))
+
+<span class="kw">if not</span> full.startswith(BASE_DIR + os.sep):
+    <span class="fn">abort</span>(<span class="num">403</span>)  <span class="cmt"># Traversal attempt detected</span>
+
+<span class="fn">open</span>(full)</code></pre>
+
+  <h2 id="impact">Security Impact</h2>
+
+  <p>In a production environment, this class of vulnerability allows an attacker to read any file the web server process has permission to access:</p>
+
+  <div class="impact-grid">
+    <div class="impact-item"><span class="impact-dot"></span>Configuration files</div>
+    <div class="impact-item"><span class="impact-dot"></span>Application source code</div>
+    <div class="impact-item"><span class="impact-dot"></span>Environment variables</div>
+    <div class="impact-item"><span class="impact-dot"></span>Database credentials</div>
+    <div class="impact-item"><span class="impact-dot"></span>Private API keys</div>
+    <div class="impact-item"><span class="impact-dot"></span>User data / PII</div>
+    <div class="impact-item"><span class="impact-dot"></span>SSH private keys</div>
+    <div class="impact-item"><span class="impact-dot"></span>/etc/passwd (Linux)</div>
+  </div>
+
+  <div class="callout callout-danger">
+    <div class="callout-title">
+      <span class="callout-icon">!</span>
+      CVSS Classification
+    </div>
+    Path Traversal is classified as <strong>CWE-22</strong> and can achieve CVSS scores of 7.5–9.8 (High to Critical) depending on what files are exposed. It appears consistently in the OWASP Top 10 under <em>Broken Access Control</em>.
+  </div>
+
+  <h2 id="remediation">Remediation</h2>
+
+  <p>Four layers of defense can eliminate or mitigate this vulnerability:</p>
+
+  <div class="remed-grid">
+    <div class="remed-card">
+      <div class="remed-num">Method 01</div>
+      <div class="remed-title">Canonical Path Check</div>
+      <div class="remed-desc">Resolve the absolute path with <code>os.path.realpath()</code> and assert it starts with the allowed base directory before reading.</div>
+    </div>
+    <div class="remed-card">
+      <div class="remed-num">Method 02</div>
+      <div class="remed-title">Allowlist Validation</div>
+      <div class="remed-desc">Only accept filenames that exist in a predefined list. Reject anything else before constructing a path.</div>
+    </div>
+    <div class="remed-card">
+      <div class="remed-num">Method 03</div>
+      <div class="remed-title">Strip Traversal Sequences</div>
+      <div class="remed-desc">Reject or sanitize inputs containing <code>../</code>, <code>..\</code>, or null bytes before any path construction occurs.</div>
+    </div>
+    <div class="remed-card">
+      <div class="remed-num">Method 04</div>
+      <div class="remed-title">Indirect File References</div>
+      <div class="remed-desc">Accept only an opaque ID (e.g. <code>?id=1</code>) that maps server-side to a specific file, removing path logic from user input entirely.</div>
+    </div>
+  </div>
+
+  <div class="summary-strip">
+    <div class="summary-item">
+      <div class="summary-label">Vulnerability</div>
+      <div class="summary-value">Path Traversal</div>
+    </div>
+    <div class="summary-item">
+      <div class="summary-label">CWE</div>
+      <div class="summary-value">CWE-22</div>
+    </div>
+    <div class="summary-item">
+      <div class="summary-label">Difficulty</div>
+      <div class="summary-value">Beginner</div>
+    </div>
+    <div class="summary-item">
+      <div class="summary-label">Status</div>
+      <div class="summary-value">✓ Solved</div>
+    </div>
+    <div class="summary-item">
+      <div class="summary-label">Category</div>
+      <div class="summary-value">Web Security</div>
+    </div>
+  </div>
+
+</main>
+
+</body>
+</html>

@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Beyond Payloads - Learning to Think Like a Penetration Tester</title>
+
+<style>
+body{
+    font-family:Arial,Helvetica,sans-serif;
+    max-width:1000px;
+    margin:auto;
+    background:#f4f6f8;
+    color:#222;
+    line-height:1.7;
+    padding:40px;
+}
+
+h1,h2,h3{
+    color:#0b5394;
+}
+
+pre{
+    background:#222;
+    color:#7CFC00;
+    padding:15px;
+    overflow:auto;
+    border-radius:5px;
+}
+
+code{
+    color:#0b5394;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+table,th,td{
+    border:1px solid #ccc;
+}
+
+th{
+    background:#0b5394;
+    color:white;
+}
+
+th,td{
+    padding:10px;
+    text-align:left;
+}
+
+blockquote{
+    background:#eef6ff;
+    border-left:5px solid #0b5394;
+    padding:15px;
+}
+</style>
+
+</head>
+
+<body>
+
+<h1>Beyond Payloads: Learning to Think Like a Penetration Tester</h1>
+
+<p>
+Today's lab was completed on <strong>PortSwigger Web Security Academy</strong>.
+Unlike previous Capture-The-Flag (CTF) exercises where the objective was simply to retrieve a flag,
+this exercise focused on understanding the methodology behind identifying, validating,
+and exploiting a SQL Injection vulnerability protected by a Web Application Firewall (WAF).
+</p>
+
+<hr>
+
+<h2>Lab</h2>
+
+<p>
+
+<strong>SQL Injection with Filter Bypass via XML Encoding</strong>
+
+</p>
+
+<hr>
+
+<h2>Objective</h2>
+
+<ul>
+
+<li>Identify an SQL Injection vulnerability hidden inside an XML request.</li>
+
+<li>Understand why a WAF blocks obvious SQL Injection payloads.</li>
+
+<li>Learn XML encoding techniques to bypass request filtering.</li>
+
+<li>Extract administrator credentials from the database.</li>
+
+</ul>
+
+<hr>
+
+<h2>Initial Observation</h2>
+
+<p>
+
+While browsing the vulnerable e-commerce application,
+clicking <strong>"Check Stock"</strong> generated the following request:
+
+</p>
+
+<pre>
+POST /product/stock
+
+&lt;stockCheck&gt;
+    &lt;productId&gt;3&lt;/productId&gt;
+    &lt;storeId&gt;2&lt;/storeId&gt;
+&lt;/stockCheck&gt;
+</pre>
+
+<p>
+
+This immediately revealed that user input was submitted in XML format,
+making XML parsing a potential attack surface.
+
+</p>
+
+<hr>
+
+<h2>First Hypothesis</h2>
+
+<p>
+
+I initially assumed the vulnerability existed inside the
+<strong>storeId</strong> parameter.
+
+The first payload attempted was:
+
+</p>
+
+<pre>
+2'
+</pre>
+
+<p>
+
+Result:
+
+</p>
+
+<pre>
+HTTP 403
+Attack detected
+</pre>
+
+<p>
+
+This strongly suggested that a Web Application Firewall (WAF)
+was inspecting requests before they reached the application.
+
+</p>
+
+<hr>
+
+<h2>Understanding the WAF</h2>
+
+<p>
+
+Rather than immediately searching for exploit payloads,
+I spent time understanding why the request failed.
+
+I researched:
+
+</p>
+
+<ul>
+
+<li>XML special characters</li>
+
+<li>Named XML entities</li>
+
+<li>Numeric character references</li>
+
+<li>How XML parsers decode input</li>
+
+<li>How WAFs inspect requests</li>
+
+</ul>
+
+<p>
+
+This research introduced two important concepts.
+
+</p>
+
+<table>
+
+<tr>
+<th>Type</th>
+<th>Example</th>
+</tr>
+
+<tr>
+<td>Named Entity</td>
+<td>&amp;apos;</td>
+</tr>
+
+<tr>
+<td>Numeric Entity</td>
+<td>&amp;#39;</td>
+</tr>
+
+<tr>
+<td>Hexadecimal Entity</td>
+<td>&amp;#x27;</td>
+</tr>
+
+</table>
+
+<hr>
+
+<h2>Installing Hackvertor</h2>
+
+<p>
+
+The PortSwigger lab recommended the Hackvertor Burp extension.
+
+Unfortunately, installation repeatedly crashed Burp Suite.
+
+After several attempts and troubleshooting,
+the extension was successfully installed.
+
+</p>
+
+<p>
+
+This introduced another useful lesson:
+
+</p>
+
+<blockquote>
+
+Professional penetration testing is often less about exploiting vulnerabilities
+and more about troubleshooting tooling.
+
+</blockquote>
+
+<hr>
+
+<h2>Encoding SQL Payloads</h2>
+
+<p>
+
+Using Hackvertor, I learned how payloads could be transformed into
+numeric XML entities.
+
+</p>
+
+<p>
+
+Example:
+
+</p>
+
+<pre>
+Original
+
+' ORDER BY 1--
+</pre>
+
+<pre>
+Encoded
+
+&#39;&#32;&#79;&#82;&#68;&#69;&#82;&#32;&#66;&#89;&#32;&#49;&#45;&#45;
+</pre>
+
+<p>
+
+After XML parsing, the backend reconstructs the original SQL payload.
+
+</p>
+
+<hr>
+
+<h2>Testing the WAF</h2>
+
+<p>
+
+The encoded payload successfully bypassed the WAF.
+
+Instead of receiving:
+
+</p>
+
+<pre>
+403 Attack detected
+</pre>
+
+<p>
+
+the application returned:
+
+</p>
+
+<pre>
+HTTP 200
+
+0 units
+</pre>
+
+<p>
+
+This demonstrated that the filter had been bypassed,
+even though the SQL Injection itself had not yet been confirmed.
+
+</p>
+
+<hr>
+
+<h2>Mistakes Along the Way</h2>
+
+<ul>
+
+<li>Attempted SQL Injection before confirming whether input was evaluated.</li>
+
+<li>Assumed the application used quoted SQL values.</li>
+
+<li>Encoded the entire payload instead of understanding keyword obfuscation.</li>
+
+<li>Focused on payloads before understanding application behaviour.</li>
+
+</ul>
+
+<hr>
+
+<h2>Official Solution Analysis</h2>
+
+<p>
+
+After extensive testing,
+I compared my methodology with the official PortSwigger solution.
+
+The biggest insight was that the solution first proved the application evaluated expressions.
+
+</p>
+
+Example:
+
+<pre>
+1+1
+</pre>
+
+<p>
+
+Instead of immediately injecting SQL.
+
+Only after proving evaluation did the solution move to UNION SELECT attacks.
+
+This reinforced the importance of methodology over memorised payloads.
+
+</p>
+
+<hr>
+
+<h2>Major Lessons Learned</h2>
+
+<ul>
+
+<li>Always understand the application before attempting exploitation.</li>
+
+<li>Never assume the SQL query structure.</li>
+
+<li>Validate whether input is interpreted or treated as plain text.</li>
+
+<li>Researching protocols often reveals bypass opportunities.</li>
+
+<li>XML parsing occurs before backend SQL execution.</li>
+
+<li>Numeric XML entities can bypass keyword-based filtering.</li>
+
+<li>Hackvertor automates payload encoding but should not replace understanding.</li>
+
+<li>A WAF bypass is not the same as a successful SQL Injection.</li>
+
+<li>Methodology is more valuable than memorised payloads.</li>
+
+</ul>
+
+<hr>
+
+<h2>Biggest Personal Takeaway</h2>
+
+<blockquote>
+
+Today's exercise changed my mindset.
+
+Instead of asking:
+
+"What payload should I use?"
+
+I found myself asking:
+
+"How can I prove my assumptions before attempting exploitation?"
+
+That shift represents the difference between simply solving CTF challenges
+and thinking like a professional penetration tester.
+
+</blockquote>
+
+<hr>
+
+<h2>Tools Used</h2>
+
+<ul>
+
+<li>Burp Suite Community Edition</li>
+
+<li>Burp Repeater</li>
+
+<li>Hackvertor Extension</li>
+
+<li>PortSwigger Web Security Academy</li>
+
+<li>Browser Developer Tools</li>
+
+</ul>
+
+<hr>
+
+<h2>Skills Strengthened</h2>
+
+<ul>
+
+<li>HTTP Request Analysis</li>
+
+<li>Burp Repeater</li>
+
+<li>XML Parsing</li>
+
+<li>SQL Injection Methodology</li>
+
+<li>WAF Behaviour Analysis</li>
+
+<li>Payload Obfuscation</li>
+
+<li>Critical Thinking</li>
+
+<li>Troubleshooting Security Tools</li>
+
+</ul>
+
+<hr>
+
+<h2>Final Reflection</h2>
+
+<p>
+
+Although I eventually reviewed the official solution,
+the majority of the learning came from the investigation itself.
+
+The process involved observing application behaviour,
+forming hypotheses,
+testing them,
+researching unfamiliar technologies,
+and adapting my approach based on evidence.
+
+The greatest lesson was not learning a SQL Injection payload,
+but learning to approach web application security as a structured investigative process.
+
+</p>
+
+<hr>
+
+<p>
+
+<strong>Author:</strong> Nicholas Agwah<br>
+<strong>Platform:</strong> PortSwigger Web Security Academy<br>
+<strong>Topic:</strong> SQL Injection • XML Encoding • WAF Bypass • Burp Suite • Penetration Testing Methodology
+
+</p>
+
+</body>
+</html>
