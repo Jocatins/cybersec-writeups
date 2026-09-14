@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL Injection UNION Attack — Determining the Number of Columns</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            line-height: 1.7;
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 0 20px;
+            color: #222;
+            background: #f7f7f7;
+        }
+
+        article {
+            background: #fff;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+        }
+
+        h1 {
+            color: #1f2937;
+            border-bottom: 3px solid #2563eb;
+            padding-bottom: 12px;
+        }
+
+        h2 {
+            color: #1d4ed8;
+            margin-top: 35px;
+        }
+
+        h3 {
+            color: #374151;
+        }
+
+        code {
+            background: #eef2f7;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-family: Consolas, monospace;
+        }
+
+        pre {
+            background: #111827;
+            color: #f9fafb;
+            padding: 18px;
+            border-radius: 7px;
+            overflow-x: auto;
+            font-family: Consolas, monospace;
+        }
+
+        blockquote {
+            border-left: 4px solid #2563eb;
+            margin: 20px 0;
+            padding: 10px 20px;
+            background: #eff6ff;
+            color: #1e3a8a;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th,
+        td {
+            border: 1px solid #d1d5db;
+            padding: 12px;
+            text-align: left;
+        }
+
+        th {
+            background: #e5e7eb;
+        }
+
+        .success {
+            background: #ecfdf5;
+            border-left: 5px solid #10b981;
+            padding: 15px 20px;
+            margin: 20px 0;
+        }
+
+        .info {
+            background: #eff6ff;
+            border-left: 5px solid #2563eb;
+            padding: 15px 20px;
+            margin: 20px 0;
+        }
+
+        ul {
+            padding-left: 25px;
+        }
+
+        .metadata {
+            background: #f3f4f6;
+            padding: 20px;
+            border-radius: 7px;
+        }
+    </style>
+</head>
+
+<body>
+
+<article>
+
+    <h1>SQL Injection UNION Attack — Determining the Number of Columns</h1>
+
+    <div class="metadata">
+        <p><strong>Lab:</strong> SQL injection UNION attack, determining the number of columns returned by the query</p>
+        <p><strong>Difficulty:</strong> Practitioner</p>
+        <p><strong>Objective:</strong> Determine the number of columns returned by the application's SQL query by using a <code>UNION SELECT</code> injection containing <code>NULL</code> values.</p>
+    </div>
+
+    <h2>Objective</h2>
+
+    <p>
+        The purpose of this lab was to determine how many columns were being returned by the vulnerable SQL query behind the product category filter.
+    </p>
+
+    <p>
+        A <strong>UNION</strong> attack requires both queries to return the <strong>same number of columns</strong>.
+        Therefore, before attempting to retrieve information from another table, we first needed to determine
+        the number of columns in the original query.
+    </p>
+
+    <h2>Step 1 — Identifying the Injection Point</h2>
+
+    <p>
+        The lab indicated that the vulnerability existed in the <strong>product category filter</strong>.
+    </p>
+
+    <p>
+        We intercepted the request using <strong>Burp Suite</strong> and sent it to
+        <strong>Repeater</strong> so that we could modify the <code>category</code> parameter and observe
+        the application's responses.
+    </p>
+
+    <p>The parameter was conceptually similar to:</p>
+
+    <pre>category=Gifts</pre>
+
+    <p>
+        Because the application was vulnerable to SQL injection, we could manipulate the value supplied
+        to this parameter.
+    </p>
+
+    <h2>Step 2 — Understanding the UNION Technique</h2>
+
+    <p>
+        The important concept behind this attack is that a SQL <code>UNION</code> combines the results
+        of two <code>SELECT</code> statements.
+    </p>
+
+    <p>For example:</p>
+
+    <pre>SELECT column1, column2, column3
+FROM products
+WHERE category = 'Gifts'</pre>
+
+    <p>could potentially be combined with:</p>
+
+    <pre>UNION SELECT NULL, NULL, NULL</pre>
+
+    <p>
+        However, the number of columns must match.
+    </p>
+
+    <p>
+        For example, if the original query returns three columns:
+    </p>
+
+    <pre>SELECT column1, column2, column3</pre>
+
+    <p>then this would be valid:</p>
+
+    <pre>UNION SELECT NULL, NULL, NULL</pre>
+
+    <p>while this would not:</p>
+
+    <pre>UNION SELECT NULL, NULL</pre>
+
+    <p>
+        because the second query only contains two columns.
+    </p>
+
+    <h2>Step 3 — Testing Different Numbers of Columns</h2>
+
+    <p>
+        We started by injecting a <code>UNION SELECT</code> containing a single <code>NULL</code> value:
+    </p>
+
+    <pre>' UNION SELECT NULL--</pre>
+
+    <p>
+        The application returned an HTTP <strong>500 error</strong>.
+    </p>
+
+    <p>
+        This suggested that the number of columns in our injected query did not match the number of
+        columns returned by the original query.
+    </p>
+
+    <p>We then increased the number of <code>NULL</code> values:</p>
+
+    <pre>' UNION SELECT NULL,NULL--</pre>
+
+    <p>
+        This also resulted in an HTTP <strong>500 error</strong>.
+    </p>
+
+    <p>Next, we tried:</p>
+
+    <pre>' UNION SELECT NULL,NULL,NULL--</pre>
+
+    <p>
+        This time, the application returned the successful response:
+    </p>
+
+    <blockquote>
+        Congratulations, you have solved the lab.
+    </blockquote>
+
+    <p>
+        Finally, the four-column attempt was also tested:
+    </p>
+
+    <pre>' UNION SELECT NULL,NULL,NULL,NULL--</pre>
+
+    <p>
+        It returned an HTTP <strong>500 error</strong>.
+    </p>
+
+    <h2>Step 4 — Interpreting the Results</h2>
+
+    <p>Our observations were:</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Payload</th>
+                <th>Result</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>' UNION SELECT NULL--</code></td>
+                <td>HTTP 500</td>
+            </tr>
+            <tr>
+                <td><code>' UNION SELECT NULL,NULL--</code></td>
+                <td>HTTP 500</td>
+            </tr>
+            <tr>
+                <td><code>' UNION SELECT NULL,NULL,NULL--</code></td>
+                <td><strong>Lab solved</strong></td>
+            </tr>
+            <tr>
+                <td><code>' UNION SELECT NULL,NULL,NULL,NULL--</code></td>
+                <td>HTTP 500</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <p>
+        The important result was:
+    </p>
+
+    <pre>' UNION SELECT NULL,NULL,NULL--</pre>
+
+    <p>
+        The successful response tells us that the injected <code>SELECT</code> contained the correct
+        number of columns.
+    </p>
+
+    <div class="success">
+        <strong>Conclusion:</strong> The original SQL query returns <strong>3 columns</strong>.
+    </div>
+
+    <h2>Why NULL Was Used</h2>
+
+    <p>
+        We used <code>NULL</code> because we were not yet interested in retrieving actual data.
+    </p>
+
+    <p>
+        At this stage, our only goal was to determine the <strong>number of columns</strong>.
+    </p>
+
+    <p>
+        Using <code>NULL</code> also avoids having to immediately know the data type expected by each
+        column.
+    </p>
+
+    <p>
+        Later in a UNION-based SQL injection, we may replace these <code>NULL</code> values with actual
+        expressions or database information.
+    </p>
+
+    <p>For example:</p>
+
+    <pre>UNION SELECT username, password, NULL</pre>
+
+    <p>
+        But that would only make sense after determining the number of columns and understanding which
+        columns can accept the data we want to retrieve.
+    </p>
+
+    <h2>Understanding the Successful Payload</h2>
+
+    <p>Our successful payload was:</p>
+
+    <pre>' UNION SELECT NULL,NULL,NULL--</pre>
+
+    <p>
+        Conceptually, the original query could have looked something like:
+    </p>
+
+    <pre>SELECT column1, column2, column3
+FROM products
+WHERE category = 'Gifts'</pre>
+
+    <p>
+        Our injection modifies the query so that the database attempts to execute something equivalent to:
+    </p>
+
+    <pre>SELECT column1, column2, column3
+FROM products
+WHERE category = 'Gifts'
+UNION
+SELECT NULL,NULL,NULL
+--'</pre>
+
+    <p>
+        The <code>--</code> begins a SQL comment, causing the remainder of the original query to be ignored.
+    </p>
+
+    <p>
+        Most importantly, both <code>SELECT</code> statements contain <strong>three columns</strong>,
+        allowing the <code>UNION</code> operation to succeed.
+    </p>
+
+    <h2>Key Lesson</h2>
+
+    <p>
+        This lab demonstrated one of the fundamental steps in a UNION-based SQL injection attack:
+    </p>
+
+    <blockquote>
+        Before retrieving data with <code>UNION SELECT</code>, determine how many columns the original query returns.
+    </blockquote>
+
+    <p>
+        We discovered the number of columns by gradually increasing the number of <code>NULL</code> values
+        until the database accepted the UNION query.
+    </p>
+
+    <p>The successful payload was:</p>
+
+    <pre>' UNION SELECT NULL,NULL,NULL--</pre>
+
+    <p>
+        Therefore, the vulnerable query returns:
+    </p>
+
+    <pre>3 columns</pre>
+
+    <h2>What I Learned</h2>
+
+    <ul>
+        <li>How to use <strong>Burp Suite Repeater</strong> to test SQL injection payloads.</li>
+        <li>How <code>UNION SELECT</code> can be used to interact with the results of an existing SQL query.</li>
+        <li>Why the number of columns in both queries must match.</li>
+        <li>How HTTP 500 responses can provide useful feedback during SQL injection testing.</li>
+        <li>Why <code>NULL</code> values are useful when determining the number of columns.</li>
+        <li>How SQL comments such as <code>--</code> can be used to terminate the remainder of the original query.</li>
+        <li>
+            Most importantly, I learned <strong>why the payload works</strong> instead of simply memorizing it.
+        </li>
+    </ul>
+
+    <h2>Final Result</h2>
+
+    <div class="success">
+        <p><strong>Lab successfully solved.</strong></p>
+        <p><strong>Confirmed column count:</strong> 3</p>
+        <p><strong>Successful payload:</strong></p>
+
+        <pre>' UNION SELECT NULL,NULL,NULL--</pre>
+    </div>
+
+</article>
+
+</body>
+</html>

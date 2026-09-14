@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DOM XSS Writeup - jQuery Selector Sink Using Hashchange</title>
+<style>
+  :root { --bg:#f6f8fb; --card:#fff; --text:#172033; --muted:#5d687b; --line:#dce3ed; --accent:#2457d6; --code:#111827; --codeText:#e5edf7; --good:#e7f6ed; --warn:#fff4d6; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:Arial, Helvetica, sans-serif; line-height:1.65; }
+  main { max-width:1050px; margin:32px auto; padding:0 20px 50px; }
+  header { background:linear-gradient(135deg,#182848,#315bb5); color:white; padding:36px; border-radius:18px; }
+  h1,h2,h3 { line-height:1.25; }
+  h1 { margin:0 0 10px; font-size:2.2rem; }
+  h2 { margin-top:36px; border-bottom:1px solid var(--line); padding-bottom:8px; }
+  h3 { margin-top:24px; }
+  .subtitle { opacity:.9; }
+  .tag { display:inline-block; padding:4px 10px; border-radius:999px; background:#ffffff22; margin:4px 5px 0 0; font-size:.85rem; }
+  section, .callout { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:22px; margin-top:22px; }
+  .callout.good { background:var(--good); border-color:#b9dfc7; }
+  .callout.warn { background:var(--warn); border-color:#ecd28a; }
+  pre { background:var(--code); color:var(--codeText); padding:16px; border-radius:10px; overflow-x:auto; white-space:pre-wrap; word-break:break-word; }
+  code { font-family:Consolas, Monaco, monospace; }
+  p code, li code, td code { background:#eef2f7; padding:2px 5px; border-radius:4px; color:#26364d; }
+  pre code { background:transparent; color:inherit; padding:0; }
+  table { width:100%; border-collapse:collapse; margin:15px 0; }
+  th,td { text-align:left; border:1px solid var(--line); padding:10px; vertical-align:top; }
+  th { background:#eef3fa; }
+  .flow { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:15px 0; }
+  .flow span { background:#eaf0ff; border:1px solid #c6d5ff; color:#173c9b; padding:8px 12px; border-radius:8px; font-weight:bold; }
+  .arrow { color:var(--accent); font-weight:bold; }
+  .small { color:var(--muted); font-size:.93rem; }
+  li { margin:7px 0; }
+  .checklist li { list-style:"☐  "; padding-left:5px; }
+  footer { margin-top:30px; color:var(--muted); font-size:.9rem; text-align:center; }
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>DOM XSS in jQuery Selector Sink Using a Hashchange Event</h1>
+  <p class="subtitle">PortSwigger Web Security Academy · Apprentice lab writeup</p>
+  <span class="tag">DOM-based XSS</span>
+  <span class="tag">location.hash</span>
+  <span class="tag">jQuery $() selector</span>
+  <span class="tag">hashchange</span>
+  <span class="tag">Exploit Server</span>
+</header>
+
+<section>
+<h2>1. Lab objective</h2>
+<p>The home page contains a DOM-based cross-site scripting vulnerability. The page reads a post title from the URL fragment using <code>location.hash</code>. That value is then passed into jQuery's <code>$()</code> selector function to find and automatically scroll to a post.</p>
+<p>The goal is to deliver an exploit to the victim that executes <code>print()</code> in the victim's browser.</p>
+<div class="callout good">
+<strong>Result:</strong> The lab was solved with an iframe whose <code>onload</code> handler appends an HTML payload to the target URL's fragment.
+</div>
+</section>
+
+<section>
+<h2>2. What I learned</h2>
+<ul>
+<li>DOM XSS can happen entirely in the browser without the server reflecting the payload into the HTML response.</li>
+<li><code>location.hash</code> reads the URL fragment after the <code>#</code>.</li>
+<li>The browser console is useful for checking the current fragment and monitoring hash changes.</li>
+<li>A jQuery selector sink can become dangerous when attacker-controlled data is used as a selector.</li>
+<li>The right payload depends on the exact context where the input is inserted.</li>
+<li>Burp helps inspect requests and application behavior, while DevTools helps inspect the DOM and execute JavaScript experiments.</li>
+<li>An exploit server can deliver a payload to a victim, which is different from simply proving the vulnerability locally.</li>
+</ul>
+</section>
+
+<section>
+<h2>3. Source → sink → context</h2>
+<div class="flow">
+<span>Attacker-controlled URL fragment</span><b class="arrow">→</b>
+<span><code>location.hash</code></span><b class="arrow">→</b>
+<span>jQuery <code>$()</code></span><b class="arrow">→</b>
+<span>DOM interpretation</span><b class="arrow">→</b>
+<span><code>print()</code></span>
+</div>
+<table>
+<tr><th>Part</th><th>Meaning in this lab</th></tr>
+<tr><td>Source</td><td><code>location.hash</code>, which reads the fragment after <code>#</code>.</td></tr>
+<tr><td>Event</td><td>The <code>hashchange</code> event runs when the fragment changes.</td></tr>
+<tr><td>Sink</td><td>jQuery's <code>$()</code> selector function, which interprets the supplied string as a selector or HTML depending on its content.</td></tr>
+<tr><td>Context</td><td>The input is supplied to a jQuery selector. An HTML-looking string can be interpreted as markup and create an element.</td></tr>
+<tr><td>Goal</td><td>Cause the browser to execute <code>print()</code>.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>4. Understanding the URL fragment</h2>
+<p>Consider this example:</p>
+<pre><code>https://example.com/?page=home#post-4</code></pre>
+<table>
+<tr><th>Expression</th><th>Value</th></tr>
+<tr><td><code>location.href</code></td><td>The complete URL.</td></tr>
+<tr><td><code>location.search</code></td><td><code>?page=home</code></td></tr>
+<tr><td><code>location.hash</code></td><td><code>#post-4</code></td></tr>
+</table>
+<p>The fragment is commonly used for page navigation, anchors, tabs, and client-side routing. It is especially interesting in DOM XSS because JavaScript can read it directly from the browser.</p>
+</section>
+
+<section>
+<h2>5. Using the browser console</h2>
+<h3>5.1 Check the current hash</h3>
+<p>Open the lab home page, press <strong>F12</strong> or <strong>Ctrl + Shift + I</strong>, select the <strong>Console</strong> tab, and run:</p>
+<pre><code>location.hash</code></pre>
+<p>If the URL ends with <code>#post-4</code>, the console should return a string similar to:</p>
+<pre><code>"#post-4"</code></pre>
+
+<h3>5.2 Check the complete URL</h3>
+<pre><code>location.href</code></pre>
+
+<h3>5.3 Change the hash manually</h3>
+<pre><code>location.hash = "post-4";</code></pre>
+<p>This changes the URL fragment without necessarily reloading the whole page. It can also trigger a <code>hashchange</code> event.</p>
+
+<h3>5.4 Listen for hash changes</h3>
+<pre><code>window.addEventListener("hashchange", () => {
+  console.log("Hash changed to:", location.hash);
+});</code></pre>
+<p>Now change the fragment in the address bar or run:</p>
+<pre><code>location.hash = "post-5";</code></pre>
+<p>The console should log the new hash. This is useful when the vulnerable code runs only after a hash change.</p>
+
+<h3>5.5 Inspect the decoded fragment</h3>
+<pre><code>decodeURIComponent(location.hash.slice(1));</code></pre>
+<p><code>slice(1)</code> removes the leading <code>#</code>. <code>decodeURIComponent()</code> converts percent-encoded characters into their readable form.</p>
+
+<div class="callout warn">
+<strong>Important:</strong> Do not assume the fragment is automatically decoded in every application. Check how the page processes it. The relevant value may be raw, decoded, normalized, or transformed before reaching the sink.
+</div>
+</section>
+
+<section>
+<h2>6. Finding the vulnerable code with DevTools</h2>
+<ol>
+<li>Open the lab home page.</li>
+<li>Press <strong>F12</strong> to open DevTools.</li>
+<li>Use the <strong>Sources</strong> tab or choose <strong>View page source</strong>.</li>
+<li>Press <strong>Ctrl + F</strong> and search for terms such as <code>hashchange</code>, <code>location.hash</code>, <code>scroll</code>, <code>$()</code>, or a post identifier.</li>
+<li>Look for code that reads the hash and passes it into jQuery.</li>
+</ol>
+<p>The vulnerable logic is conceptually similar to:</p>
+<pre><code>window.addEventListener("hashchange", function () {
+    var postTitle = decodeURIComponent(location.hash.slice(1));
+
+    var post = $("section.blog-list h2:contains(" + postTitle + ")");
+
+    if (post.length) {
+        post[0].scrollIntoView();
+    }
+});</code></pre>
+<p>The exact source code may differ, but the important pattern is:</p>
+<pre><code>attacker-controlled hash
+        ↓
+location.hash
+        ↓
+string concatenation
+        ↓
+jQuery $() selector
+        ↓
+DOM interpretation</code></pre>
+</section>
+
+<section>
+<h2>7. Why the jQuery selector is dangerous</h2>
+<p>jQuery's <code>$()</code> function is normally used to select elements:</p>
+<pre><code>$(".post-title");</code></pre>
+<p>However, jQuery can also interpret certain HTML-looking strings as markup:</p>
+<pre><code>$("<div>Example</div>");</code></pre>
+<p>If untrusted input is concatenated into a selector, an attacker may be able to break out of the intended selector and supply HTML that creates an event-handler execution path.</p>
+<p>The vulnerability is not simply that <code>location.hash</code> exists. The vulnerability occurs because untrusted hash data reaches a dangerous interpretation point without adequate validation or safe handling.</p>
+</section>
+
+<section>
+<h2>8. Building the exploit</h2>
+<p>The successful payload was:</p>
+<pre><code>&lt;iframe src="https://0a01002a03cc74e880b10d5b008100d7.web-security-academy.net/#" onload="this.src+='&lt;img src=x onerror=print()&gt;'"&gt;&lt;/iframe&gt;</code></pre>
+<p>Formatted for readability:</p>
+<pre><code>&lt;iframe
+  src="https://0a01002a03cc74e880b10d5b008100d7.web-security-academy.net/#"
+  onload="this.src+='&lt;img src=x onerror=print()&gt;'"
+&gt;&lt;/iframe&gt;</code></pre>
+
+<h3>8.1 What each part does</h3>
+<table>
+<tr><th>Payload part</th><th>Purpose</th></tr>
+<tr><td><code>&lt;iframe&gt;</code></td><td>Loads the vulnerable lab inside a frame.</td></tr>
+<tr><td><code>src=".../#"</code></td><td>Loads the target page with an initially empty fragment.</td></tr>
+<tr><td><code>onload</code></td><td>Runs after the iframe loads.</td></tr>
+<tr><td><code>this.src += ...</code></td><td>Appends the HTML-looking string to the iframe's current URL.</td></tr>
+<tr><td><code>&lt;img src=x ...&gt;</code></td><td>Creates an image element with an intentionally invalid source.</td></tr>
+<tr><td><code>onerror="print()"</code></td><td>Runs when the image fails to load.</td></tr>
+</table>
+
+<h3>8.2 Why the hashchange event matters</h3>
+<p>The iframe first loads the target with:</p>
+<pre><code>https://0a01002a03cc74e880b10d5b008100d7.web-security-academy.net/#</code></pre>
+<p>When the iframe finishes loading, the <code>onload</code> handler changes its URL fragment by appending:</p>
+<pre><code>&lt;img src=x onerror=print()&gt;</code></pre>
+<p>That fragment change triggers the target page's <code>hashchange</code> handler. The vulnerable code reads the new hash and passes it to jQuery's selector function, where the HTML-looking input is interpreted and the image error handler executes.</p>
+</section>
+
+<section>
+<h2>9. Exploit Server steps</h2>
+<ol>
+<li>Open the lab and copy the exact lab URL.</li>
+<li>Open the lab's <strong>Exploit server</strong>.</li>
+<li>In the <strong>Body</strong> section, paste the iframe payload.</li>
+<li>Ensure the target lab ID is the exact one assigned to your lab.</li>
+<li>Click <strong>Store</strong>.</li>
+<li>Click <strong>View exploit</strong>.</li>
+<li>Confirm that the browser calls <code>print()</code> or displays the print dialog.</li>
+<li>Return to the exploit server.</li>
+<li>Click <strong>Deliver to victim</strong>.</li>
+<li>Wait for the lab to confirm completion.</li>
+</ol>
+<div class="callout good">
+<strong>Verification:</strong> Viewing the exploit confirms that the payload works in your browser. Delivering it to the victim completes the lab's intended attack flow.
+</div>
+</section>
+
+<section>
+<h2>10. Where Burp fits</h2>
+<p>Burp Suite is useful, but it is not always required for DOM XSS. The main vulnerability executes in the browser, so DevTools is often the fastest place to investigate.</p>
+<table>
+<tr><th>Tool</th><th>What I use it for</th></tr>
+<tr><td>Burp Proxy</td><td>Intercept requests, inspect the page response, and understand the application flow.</td></tr>
+<tr><td>Burp Repeater</td><td>Modify URLs or parameters and resend requests to compare responses.</td></tr>
+<tr><td>DevTools Elements</td><td>Inspect the resulting DOM and check whether the input reached an element or attribute.</td></tr>
+<tr><td>DevTools Sources</td><td>Search JavaScript for sources, event handlers, and sinks.</td></tr>
+<tr><td>DevTools Console</td><td>Check <code>location.hash</code>, set test fragments, and monitor <code>hashchange</code>.</td></tr>
+<tr><td>Exploit Server</td><td>Host and deliver the exploit to the simulated victim.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>11. Common mistakes</h2>
+<ul>
+<li>Using <code>location.search</code> when the lab uses <code>location.hash</code>.</li>
+<li>Testing a payload on the wrong page.</li>
+<li>Forgetting that a hashchange-based vulnerability may require the fragment to change after the page has loaded.</li>
+<li>Looking only at the server response and not inspecting browser-side JavaScript.</li>
+<li>Using the wrong lab ID in the iframe.</li>
+<li>Testing the payload in the exploit server editor but forgetting to click <strong>View exploit</strong>.</li>
+<li>Confirming local execution but forgetting to click <strong>Deliver to victim</strong>.</li>
+<li>Assuming every jQuery selector is exploitable without checking the exact selector construction and version.</li>
+</ul>
+</section>
+
+<section>
+<h2>12. A reusable DOM XSS checklist</h2>
+<ul class="checklist">
+<li>Identify the page where the vulnerability exists.</li>
+<li>Inspect the JavaScript with DevTools or Burp.</li>
+<li>Search for sources: <code>location.hash</code>, <code>location.search</code>, <code>location.href</code>, <code>document.URL</code>, and <code>document.referrer</code>.</li>
+<li>Find the transformation: decoding, parsing, concatenation, or string replacement.</li>
+<li>Identify the sink: jQuery selector, <code>innerHTML</code>, <code>document.write</code>, <code>eval</code>, URL assignment, or an event-handler attribute.</li>
+<li>Determine the exact context where the input lands.</li>
+<li>Use a harmless marker first, such as <code>TEST123</code>.</li>
+<li>Use the console to verify the source value.</li>
+<li>Monitor relevant events such as <code>hashchange</code>.</li>
+<li>Build a payload that matches the context.</li>
+<li>Test locally with <strong>View exploit</strong>.</li>
+<li>Deliver the exploit to the victim.</li>
+</ul>
+</section>
+
+<section>
+<h2>13. Defensive lesson</h2>
+<p>The safe approach is to avoid passing untrusted strings into HTML-capable jQuery APIs or selector contexts without strict validation. The application should use safe DOM APIs, validate the expected post identifier, and avoid concatenating attacker-controlled data into selectors.</p>
+<p>For example, instead of accepting an arbitrary title from the fragment, the application could allow only a known post ID:</p>
+<pre><code>const allowedPostIds = new Set(["post-1", "post-2", "post-3"]);
+const requestedId = location.hash.slice(1);
+
+if (allowedPostIds.has(requestedId)) {
+  document.getElementById(requestedId)?.scrollIntoView();
+}</code></pre>
+<p>This is illustrative defensive code: the exact implementation should match the application's real DOM structure and routing design.</p>
+</section>
+
+<section>
+<h2>14. Final takeaway</h2>
+<p>The most important lesson from this lab is the investigation method:</p>
+<pre><code>Source:
+location.hash
+
+Event:
+hashchange
+
+Transformation:
+decode / concatenate into selector
+
+Sink:
+jQuery $()
+
+Context:
+selector string that can be interpreted as HTML
+
+Execution:
+img onerror → print()</code></pre>
+<p>Once I can identify the source, follow the data, recognize the sink, and understand the context, I can solve many DOM XSS labs without blindly guessing payloads.</p>
+</section>
+
+<footer>
+<p>Personal cybersecurity learning notes · Use these techniques only in authorized labs and systems.</p>
+</footer>
+</main>
+</body>
+</html>

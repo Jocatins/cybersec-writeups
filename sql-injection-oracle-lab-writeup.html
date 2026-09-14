@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SQL Injection Attack - Listing Database Contents on Oracle</title>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; max-width: 900px; margin: 40px auto; padding: 0 20px; color: #222; }
+    h1, h2 { color: #17324d; }
+    code, pre { background: #f4f6f8; border-radius: 6px; }
+    code { padding: 2px 5px; }
+    pre { padding: 15px; overflow-x: auto; }
+    .note { background: #eef6ff; border-left: 4px solid #2878c8; padding: 12px 16px; }
+    .success { background: #eef9f0; border-left: 4px solid #2e8b57; padding: 12px 16px; }
+    table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+    th { background: #f4f6f8; }
+  </style>
+</head>
+<body>
+
+<h1>SQL Injection Attack: Listing Database Contents on Oracle</h1>
+
+<div class="success">
+  <strong>Lab status: Solved without checking the solution.</strong>
+  The main goal was not just to obtain the administrator credentials, but to understand how each payload was constructed and why it worked.
+</div>
+
+<h2>1. Objective</h2>
+<p>
+The PortSwigger Web Security Academy lab contained a SQL injection vulnerability in the product category filter.
+The application returned the results of the SQL query in its response, allowing a UNION-based SQL injection attack.
+The database was Oracle, and the objective was to discover the credentials table, identify its columns, retrieve the credentials, and log in as the administrator.
+</p>
+
+<h2>2. Confirming SQL Injection</h2>
+<p>
+The first step was to test whether the category parameter was injectable. A single quote was appended to the category value:
+</p>
+
+<pre><code>Corporate gifts'</code></pre>
+
+<p>
+The application returned an HTTP 500 Internal Server Error. This indicated that the quote was affecting the underlying SQL syntax and provided evidence that the parameter was injectable.
+</p>
+
+<h2>3. Determining the Number of Columns</h2>
+<p>
+Before using UNION SELECT, we needed to determine how many columns the original query returned.
+We tested ORDER BY incrementally:
+</p>
+
+<pre><code>' ORDER BY 1--
+' ORDER BY 2--
+' ORDER BY 3--</code></pre>
+
+<p>
+ORDER BY 1 and ORDER BY 2 worked, while ORDER BY 3 produced an error. Therefore, the original query returned two columns.
+</p>
+
+<h2>4. Confirming a Two-Column UNION</h2>
+<p>
+Because the original query returned two columns, our UNION query also needed to return two columns.
+The lab was running Oracle, where SELECT statements require a FROM clause. Oracle's built-in DUAL table can be used when a real table is not required.
+</p>
+
+<pre><code>' UNION SELECT 'abc','def' FROM dual--</code></pre>
+
+<p>
+The response displayed both values:</p>
+
+<pre><code>abc    def</code></pre>
+
+<p>
+This confirmed that the UNION injection worked and that both columns were reflected in the application's response.
+</p>
+
+<h2>5. Confirming the Oracle Database</h2>
+<p>
+We queried Oracle's version information using the <code>v$version</code> view and its <code>BANNER</code> column:
+</p>
+
+<pre><code>' UNION SELECT banner, NULL FROM v$version--</code></pre>
+
+<p>
+The response revealed Oracle Database 11g Express Edition, version 11.2.0.2.0, along with other Oracle component versions.
+</p>
+
+<h2>6. Enumerating Database Tables</h2>
+<p>
+Instead of guessing the name of the credentials table, we used Oracle's metadata.
+<code>ALL_TABLES</code> is an Oracle data-dictionary view containing information about accessible tables, while <code>TABLE_NAME</code> identifies those tables.
+</p>
+
+<pre><code>' UNION SELECT table_name, NULL FROM all_tables--</code></pre>
+
+<p>
+Among the returned table names was:</p>
+
+<pre><code>USERS_ANOYDF</code></pre>
+
+<p>
+This was the table that appeared to contain the application's user credentials.
+</p>
+
+<h2>7. Enumerating the Table's Columns</h2>
+<p>
+Next, we queried Oracle's column metadata. <code>ALL_TAB_COLUMNS</code> contains information about columns, including their names in <code>COLUMN_NAME</code>.
+We filtered the metadata to the table we had discovered:
+</p>
+
+<pre><code>' UNION SELECT COLUMN_NAME, NULL
+FROM ALL_TAB_COLUMNS
+WHERE TABLE_NAME = 'USERS_ANOYDF'--</code></pre>
+
+<p>
+The response revealed two relevant columns:</p>
+
+<table>
+  <tr>
+    <th>Column</th>
+  </tr>
+  <tr>
+    <td>USERNAME_KJTNFZ</td>
+  </tr>
+  <tr>
+    <td>PASSWORD_QXTYIC</td>
+  </tr>
+</table>
+
+<h2>8. Extracting the Credentials</h2>
+<p>
+We now had the table name and both column names. The final UNION query selected the username and password values:
+</p>
+
+<pre><code>' UNION SELECT USERNAME_KJTNFZ, PASSWORD_QXTYIC FROM USERS_ANOYDF--</code></pre>
+
+<p>
+The application returned the contents of the credentials table. We then used the administrator credentials to complete the lab.
+</p>
+
+<h2>9. What I Actually Learned</h2>
+<ul>
+  <li>SQL injection is easier to understand when the underlying SQL structure is reasoned about rather than when payloads are memorized.</li>
+  <li><code>ORDER BY</code> can be used to determine the number of columns returned by a query.</li>
+  <li>A UNION query must return the same number of columns as the original query.</li>
+  <li>Oracle requires a FROM clause for SELECT statements, making <code>DUAL</code> useful for test queries.</li>
+  <li>Oracle's data dictionary can be used to enumerate database structure.</li>
+  <li><code>ALL_TABLES</code> helped identify the target table, while <code>ALL_TAB_COLUMNS</code> helped identify its columns.</li>
+  <li>Understanding the difference between SQL identifiers and string literals is essential. For example, <code>COLUMN_NAME</code> is an identifier, while <code>'USERS_ANOYDF'</code> is a string value.</li>
+  <li>The most valuable lesson was recognizing patterns and constructing the next payload from information discovered in the previous step.</li>
+</ul>
+
+<h2>10. Attack Chain</h2>
+<pre><code>Injectable parameter
+       ↓
+Determine column count
+       ↓
+Confirm UNION injection
+       ↓
+Identify Oracle
+       ↓
+Enumerate ALL_TABLES
+       ↓
+Find USERS_ANOYDF
+       ↓
+Enumerate ALL_TAB_COLUMNS
+       ↓
+Find USERNAME_KJTNFZ / PASSWORD_QXTYIC
+       ↓
+Extract credentials
+       ↓
+Authenticate as administrator</code></pre>
+
+<div class="note">
+  <strong>Key takeaway:</strong> The objective was not to memorize a final payload. Each payload was built from the result of the previous investigation. That pattern-recognition approach makes SQL injection techniques much easier to understand and reproduce in authorized labs.
+</div>
+
+</body>
+</html>

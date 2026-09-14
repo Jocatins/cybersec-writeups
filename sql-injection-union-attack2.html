@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL Injection UNION Attack — Finding a Column Containing Text</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 0 20px;
+            color: #222;
+            background: #f7f7f7;
+        }
+
+
+    h1, h2 {
+        color: #1f2937;
+    }
+
+    h1 {
+        border-bottom: 3px solid #333;
+        padding-bottom: 10px;
+    }
+
+    h2 {
+        margin-top: 35px;
+    }
+
+    .card {
+        background: #fff;
+        padding: 25px;
+        margin: 20px 0;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    code {
+        background: #eee;
+        padding: 3px 6px;
+        border-radius: 4px;
+    }
+
+    pre {
+        background: #1e1e1e;
+        color: #f5f5f5;
+        padding: 18px;
+        border-radius: 6px;
+        overflow-x: auto;
+    }
+
+    .success {
+        background: #e8f5e9;
+        border-left: 5px solid #2e7d32;
+        padding: 15px;
+        margin: 20px 0;
+    }
+
+    .important {
+        background: #fff8e1;
+        border-left: 5px solid #f9a825;
+        padding: 15px;
+        margin: 20px 0;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+        background: white;
+    }
+
+    th, td {
+        border: 1px solid #ddd;
+        padding: 12px;
+        text-align: left;
+    }
+
+    th {
+        background: #f0f0f0;
+    }
+
+    ul {
+        padding-left: 25px;
+    }
+</style>
+```
+
+</head>
+
+<body>
+
+```
+<h1>SQL Injection UNION Attack — Finding a Column Containing Text</h1>
+
+<div class="card">
+    <h2>Lab Overview</h2>
+
+    <p>
+        <strong>Platform:</strong> PortSwigger Web Security Academy
+    </p>
+
+    <p>
+        <strong>Lab:</strong> SQL injection UNION attack, finding a column containing text
+    </p>
+
+    <p>
+        <strong>Difficulty:</strong> Practitioner
+    </p>
+
+    <p>
+        <strong>Status:</strong> Solved
+    </p>
+
+    <p>
+        This lab contained a SQL injection vulnerability in the product category filter.
+        The application returned the results of the underlying SQL query directly in the
+        HTTP response, making it possible to use a <code>UNION SELECT</code> attack to
+        introduce additional data into the response.
+    </p>
+</div>
+
+<div class="card">
+    <h2>Objective</h2>
+
+    <p>
+        The objective was to determine which column returned by the vulnerable SQL query
+        was compatible with string data and then use that column to make the lab-provided
+        value appear in the application's response.
+    </p>
+
+    <p>
+        The lab provided the following value:
+    </p>
+
+    <pre>F8bikY</pre>
+</div>
+
+<div class="card">
+    <h2>Initial Analysis</h2>
+
+    <p>
+        The vulnerable parameter was the <code>category</code> parameter on the
+        <code>/filter</code> endpoint.
+    </p>
+
+    <p>
+        The request structure was:
+    </p>
+
+    <pre>GET /filter?category=Tech+gifts</pre>
+
+    <p>
+        Since this was a UNION-based SQL injection lab, the first step was to determine
+        the number of columns returned by the original query.
+    </p>
+</div>
+
+<div class="card">
+    <h2>Step 1 — Determine the Number of Columns</h2>
+
+    <p>
+        I tested different numbers of <code>NULL</code> values using
+        <code>UNION SELECT</code>.
+    </p>
+
+    <p>
+        The important observation was that attempts using the wrong number of columns
+        resulted in an HTTP <code>500</code> response.
+    </p>
+
+    <p>
+        I eventually tested a UNION query containing three columns:
+    </p>
+
+    <pre>' UNION SELECT NULL,NULL,NULL--</pre>
+
+    <p>
+        This established that the original query was returning three columns.
+    </p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Column</th>
+                <th>Test Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>1</td>
+                <td>NULL</td>
+            </tr>
+            <tr>
+                <td>2</td>
+                <td>NULL</td>
+            </tr>
+            <tr>
+                <td>3</td>
+                <td>NULL</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h2>Step 2 — Identify the String-Compatible Column</h2>
+
+    <p>
+        Knowing that the query returned three columns, I needed to determine which
+        column could contain string data.
+    </p>
+
+    <p>
+        I tested a string in the second column while keeping the remaining columns as
+        <code>NULL</code>:
+    </p>
+
+    <pre>' UNION SELECT NULL,'test',NULL--</pre>
+
+    <p>
+        The complete request sent through Burp Repeater was:
+    </p>
+
+    <pre>GET /filter?category=Tech+gifts' UNION SELECT NULL,'test',NULL-- HTTP/2</pre>
+
+    <p>
+        The server responded with:
+    </p>
+
+    <pre>HTTP/2 200 OK</pre>
+
+    <p>
+        More importantly, the application displayed the injected value in the response:
+    </p>
+
+    <pre>&lt;tr&gt;
+&lt;th&gt;test&lt;/th&gt;
+```
+
+</tr></pre>
+
+```
+    <div class="success">
+        <strong>Finding:</strong>
+        The second column is compatible with string data.
+    </div>
+</div>
+
+<div class="card">
+    <h2>Step 3 — Insert the Required Lab Value</h2>
+
+    <p>
+        The lab instructed me to make the following value appear in the query results:
+    </p>
+
+    <pre>F8bikY</pre>
+
+    <p>
+        Since the second column had already been confirmed to accept strings, I replaced
+        <code>test</code> with the required value.
+    </p>
+
+    <pre>' UNION SELECT NULL,'F8bikY',NULL--</pre>
+
+    <p>
+        The final HTTP request was:
+    </p>
+
+    <pre>GET /filter?category=Tech+gifts' UNION SELECT NULL,'F8bikY',NULL-- HTTP/2</pre>
+</div>
+
+<div class="card">
+    <h2>Why the Final Payload Worked</h2>
+
+    <p>
+        The successful injection can be broken down into several parts:
+    </p>
+
+    <pre>' UNION SELECT NULL,'F8bikY',NULL--</pre>
+
+    <ul>
+        <li>
+            <code>'</code> closes the string value used by the original SQL query.
+        </li>
+        <li>
+            <code>UNION SELECT</code> adds the results of another SELECT statement to
+            the original query.
+        </li>
+        <li>
+            The three values correspond to the three columns returned by the original
+            query.
+        </li>
+        <li>
+            <code>F8bikY</code> is placed in the second column because that column was
+            confirmed to support string data.
+        </li>
+        <li>
+            <code>NULL</code> is used for the other two columns because their specific
+            data types were not required for this test.
+        </li>
+        <li>
+            <code>--</code> comments out the remainder of the original SQL statement.
+        </li>
+    </ul>
+</div>
+
+<div class="card">
+    <h2>Attack Flow</h2>
+
+    <ol>
+        <li>Identify the vulnerable <code>category</code> parameter.</li>
+        <li>Determine the number of columns returned by the original query.</li>
+        <li>Confirm that the query returns three columns.</li>
+        <li>Place a test string in each column until a string-compatible column is found.</li>
+        <li>Confirm that the second column accepts string data.</li>
+        <li>Replace the test string with the lab-provided value <code>F8bikY</code>.</li>
+        <li>Verify that the value appears in the application's response.</li>
+        <li>The lab was successfully solved.</li>
+    </ol>
+</div>
+
+<div class="card">
+    <h2>Key Lessons Learned</h2>
+
+    <ul>
+        <li>
+            A UNION attack requires the injected SELECT statement to have the same number
+            of columns as the original query.
+        </li>
+        <li>
+            <code>NULL</code> values are useful when determining the number of columns
+            because they can be compatible with many SQL data types.
+        </li>
+        <li>
+            Finding the number of columns is only part of constructing a UNION attack.
+            You may also need to determine which columns accept particular data types.
+        </li>
+        <li>
+            A successful HTTP response does not necessarily mean the lab is solved.
+            The injected data must actually appear in the expected location or satisfy
+            the lab's objective.
+        </li>
+        <li>
+            Burp Suite Repeater is useful for systematically testing SQL injection
+            payloads and comparing server responses.
+        </li>
+    </ul>
+</div>
+
+<div class="success">
+    <strong>Lab Status: SOLVED ✅</strong>
+    <p>
+        The vulnerable query was confirmed to return three columns, the second column
+        was identified as string-compatible, and the required value
+        <code>F8bikY</code> was successfully returned using a UNION-based SQL injection.
+    </p>
+</div>
+
+<div class="card">
+    <h2>Final Payload</h2>
+
+    <pre>' UNION SELECT NULL,'F8bikY',NULL--</pre>
+</div>
+```
+
+</body>
+</html>

@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XSS Learning Notes - Apprentice Labs</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.65;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 40px 24px;
+      background: #f5f7fa;
+      color: #1f2937;
+    }
+
+    h1, h2, h3 {
+      color: #111827;
+    }
+
+    h1 {
+      border-bottom: 3px solid #111827;
+      padding-bottom: 12px;
+    }
+
+    h2 {
+      margin-top: 45px;
+      border-bottom: 1px solid #d1d5db;
+      padding-bottom: 8px;
+    }
+
+    h3 {
+      margin-top: 30px;
+    }
+
+    .lab {
+      background: white;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      padding: 25px;
+      margin: 25px 0;
+    }
+
+    .concept {
+      background: #eef6ff;
+      border-left: 5px solid #2563eb;
+      padding: 15px 20px;
+      margin: 20px 0;
+    }
+
+    .warning {
+      background: #fff7ed;
+      border-left: 5px solid #f97316;
+      padding: 15px 20px;
+      margin: 20px 0;
+    }
+
+    .success {
+      background: #ecfdf5;
+      border-left: 5px solid #10b981;
+      padding: 15px 20px;
+      margin: 20px 0;
+    }
+
+    .danger {
+      background: #fef2f2;
+      border-left: 5px solid #dc2626;
+      padding: 15px 20px;
+      margin: 20px 0;
+    }
+
+    code {
+      background: #e5e7eb;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: Consolas, monospace;
+    }
+
+    pre {
+      background: #111827;
+      color: #f9fafb;
+      padding: 18px;
+      border-radius: 8px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      background: white;
+    }
+
+    th, td {
+      border: 1px solid #d1d5db;
+      padding: 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f3f4f6;
+    }
+
+    .tag {
+      display: inline-block;
+      background: #e5e7eb;
+      padding: 4px 9px;
+      border-radius: 20px;
+      font-size: 13px;
+      margin: 3px;
+    }
+  </style>
+
+</head>
+
+<body>
+
+  <h1>Cross-Site Scripting (XSS) — Apprentice Lab Notes</h1>
+
+  <p>
+    These notes document the XSS challenges completed so far and focus on
+    understanding <strong>why the payload works, how payloads are constructed,
+    how the browser interprets them, attacker impact, and defensive techniques.</strong>
+  </p>
+
+  <div class="concept">
+    <strong>Core XSS principle:</strong>
+    XSS occurs when attacker-controlled data reaches a browser execution
+    context without being handled safely, allowing the attacker to influence
+    what the browser interprets as HTML or JavaScript.
+  </div>
+
+  <h2>1. The Three Questions to Ask in Every XSS Lab</h2>
+
+  <p>Instead of memorising payloads, start every XSS investigation with:</p>
+
+  <ol>
+    <li><strong>Where is my input coming from?</strong> — the source.</li>
+    <li><strong>Where does my input end up?</strong> — the sink.</li>
+    <li><strong>How is the browser interpreting it?</strong> — the context.</li>
+  </ol>
+
+  <p>
+    The context is particularly important because an XSS payload designed for
+    an HTML context may fail completely when the input is placed inside a
+    JavaScript string or an HTML attribute.
+  </p>
+
+  <pre>
+SOURCE
+  ↓
+Attacker-controlled input
+  ↓
+Application processing
+  ↓
+SINK
+  ↓
+Browser parser
+  ↓
+Execution</pre>
+
+  <h2>2. Reflected XSS into HTML Context with Nothing Encoded</h2>
+
+  <div class="lab">
+
+    <h3>Vulnerability</h3>
+
+    <p>
+      The search functionality reflects user-controlled input directly into
+      the HTML response without encoding it.
+    </p>
+
+    <p>
+      Because the input is placed directly into an HTML context, HTML supplied
+      by the attacker is interpreted as markup instead of ordinary text.
+    </p>
+
+    <h3>Payload Used</h3>
+
+    <pre>&lt;script&gt;alert(1)&lt;/script&gt;</pre>
+
+    <h3>Why Does It Work?</h3>
+
+    <p>
+      The payload consists of three important components:
+    </p>
+
+    <pre>
+&lt;script&gt;
+↓
+Start a JavaScript element
+
+alert(1)
+↓
+JavaScript to execute
+
+&lt;/script&gt;
+↓
+Close the JavaScript element</pre>
+
+    <p>
+      The vulnerable application effectively produces something conceptually
+      similar to:
+    </p>
+
+    <pre>
+&lt;div&gt;
+Search results for:
+&lt;script&gt;alert(1)&lt;/script&gt;
+&lt;/div&gt;</pre>
+
+    <p>
+      The browser parses the injected string as HTML. The
+      <code>&lt;script&gt;</code> element therefore becomes executable
+      JavaScript.
+    </p>
+
+    <h3>How Was the Payload Constructed?</h3>
+
+    <p>
+      The important observation was that the injection point was already an
+      <strong>HTML context</strong>.
+    </p>
+
+    <pre>
+HTML context
+↓
+Can I introduce an HTML element?
+↓
+&lt;script&gt;
+↓
+Can I execute JavaScript?
+↓
+alert(1)
+↓
+Close the element
+↓
+&lt;/script&gt;</pre>
+
+    <div class="success">
+      <strong>Lesson:</strong>
+      When attacker input is inserted directly into an HTML context with no
+      encoding, a simple HTML element containing JavaScript may be sufficient.
+    </div>
+
+  </div>
+
+  <h2>3. Stored XSS into HTML Context with Nothing Encoded</h2>
+
+  <div class="lab">
+
+    <h3>Vulnerability</h3>
+
+    <p>
+      The application accepts comments and stores them. When another user
+      views the blog post, the stored comment is rendered into the page
+      without appropriate output encoding.
+    </p>
+
+    <h3>Payload Used</h3>
+
+    <pre>&lt;script&gt;alert(1)&lt;/script&gt;</pre>
+
+    <h3>Why Is This Different From Reflected XSS?</h3>
+
+    <table>
+      <tr>
+        <th>Reflected XSS</th>
+        <th>Stored XSS</th>
+      </tr>
+      <tr>
+        <td>Input is reflected as part of the immediate response.</td>
+        <td>Input is stored by the application and rendered later.</td>
+      </tr>
+      <tr>
+        <td>Often requires the victim to visit a crafted URL.</td>
+        <td>The malicious content can persist on the application.</td>
+      </tr>
+      <tr>
+        <td>Payload usually travels through the request.</td>
+        <td>Payload travels through application storage.</td>
+      </tr>
+    </table>
+
+    <h3>Attack Flow</h3>
+
+    <pre>
+Attacker
+↓
+Submit malicious comment
+↓
+Application stores comment
+↓
+Victim opens blog post
+↓
+Application retrieves comment
+↓
+Comment inserted into HTML
+↓
+Browser interprets injected markup
+↓
+JavaScript executes</pre>
+
+    <h3>Why the Payload Works</h3>
+
+    <p>
+      The payload is identical to the reflected XSS example because the
+      <strong>HTML context is the same</strong>.
+    </p>
+
+    <p>
+      The difference is the lifetime and delivery mechanism of the malicious
+      input, not necessarily the syntax of the payload.
+    </p>
+
+    <div class="warning">
+      <strong>Important:</strong>
+      Stored XSS can be particularly dangerous because the attacker does not
+      necessarily need to repeatedly convince victims to visit a specially
+      crafted URL. The malicious content can remain in the application until
+      it is removed.
+    </div>
+
+  </div>
+
+  <h2>4. DOM XSS — document.write() Sink Using location.search</h2>
+
+  <div class="lab">
+
+    <h3>Vulnerability</h3>
+
+    <p>
+      This vulnerability exists entirely in client-side JavaScript.
+      The application takes attacker-controlled data from
+      <code>location.search</code> and passes it to
+      <code>document.write()</code>.
+    </p>
+
+    <h3>Source</h3>
+
+    <pre>location.search</pre>
+
+    <p>
+      The query string is attacker-controlled because the attacker can place
+      arbitrary data in the URL.
+    </p>
+
+    <h3>Sink</h3>
+
+    <pre>document.write()</pre>
+
+    <p>
+      <code>document.write()</code> can cause supplied data to be interpreted
+      as HTML.
+    </p>
+
+    <h3>First Step — Use a Canary</h3>
+
+    <p>
+      Rather than immediately attempting XSS, first enter a harmless,
+      recognisable string such as:
+    </p>
+
+    <pre>test123</pre>
+
+    <p>
+      Inspect the DOM and determine where the value appears.
+      In this lab it appears inside an image attribute similar to:
+    </p>
+
+    <pre>
+&lt;img src="...searchTerms=test123"&gt;</pre>
+
+    <h3>Identify the Context</h3>
+
+    <p>
+      The input is inside a double-quoted HTML attribute:
+    </p>
+
+    <pre>
+&lt;img src="USER_INPUT"&gt;</pre>
+
+    <p>
+      Therefore, inserting another HTML element immediately is not enough.
+      The first objective is to <strong>escape the attribute context.</strong>
+    </p>
+
+    <h3>Payload Used</h3>
+
+    <pre>"&gt;&lt;svg onload=alert(1)&gt;</pre>
+
+    <h3>How Was It Constructed?</h3>
+
+    <p>The payload can be understood as a sequence:</p>
+
+    <pre>
+"
+↓
+Escape the quoted src attribute
+
+&gt;
+↓
+Finish the HTML element
+
+&lt;svg ...&gt;
+↓
+Create a new HTML element
+
+onload=alert(1)
+↓
+Execute JavaScript when the SVG loads</pre>
+
+    <p>
+      Conceptually, the attacker is transforming:
+    </p>
+
+    <pre>
+&lt;img src="ATTACKER_INPUT"&gt;</pre>
+
+    <p>into something equivalent to:</p>
+
+    <pre>
+&lt;img src=""&gt;
+&lt;svg onload=alert(1)&gt;</pre>
+
+    <div class="success">
+      <strong>Key lesson:</strong>
+      The payload was not chosen randomly. It was constructed from the
+      injection context: first escape the attribute, then introduce an
+      executable HTML element.
+    </div>
+
+  </div>
+
+  <h2>5. DOM XSS — innerHTML Sink Using location.search</h2>
+
+  <div class="lab">
+
+    <h3>Vulnerability</h3>
+
+    <p>
+      The application retrieves attacker-controlled data from
+      <code>location.search</code> and assigns it to an element using
+      <code>innerHTML</code>.
+    </p>
+
+    <h3>Source</h3>
+
+    <pre>location.search</pre>
+
+    <h3>Sink</h3>
+
+    <pre>element.innerHTML</pre>
+
+    <h3>Payload Used</h3>
+
+    <pre>&lt;img src=1 onerror=alert(1)&gt;</pre>
+
+    <h3>Why Does It Work?</h3>
+
+    <p>
+      Unlike the previous <code>document.write()</code> lab, we do not
+      necessarily need to escape an existing quoted attribute first.
+      The input is being interpreted as HTML by <code>innerHTML</code>.
+    </p>
+
+    <p>The payload creates an image:</p>
+
+    <pre>&lt;img src=1&gt;</pre>
+
+    <p>
+      The source value is deliberately invalid in the lab context, causing an
+      image loading error.
+    </p>
+
+    <p>That error triggers:</p>
+
+    <pre>onerror=alert(1)</pre>
+
+    <p>
+      The browser therefore executes <code>alert(1)</code> when the error
+      event fires.
+    </p>
+
+    <h3>Payload Construction</h3>
+
+    <pre>
+&lt;img
+↓
+Create an HTML element
+
+src=1
+↓
+Give it a source that will fail in the lab
+
+onerror=
+↓
+Use an event handler triggered by the failure
+
+alert(1)
+↓
+JavaScript execution</pre>
+
+    <div class="concept">
+      <strong>Important:</strong>
+      This demonstrates why understanding browser events is useful when
+      studying XSS. JavaScript execution does not always require a
+      &lt;script&gt; element.
+    </div>
+
+  </div>
+
+  <h2>6. Comparing the Four Labs</h2>
+
+  <table>
+    <tr>
+      <th>Lab</th>
+      <th>Type</th>
+      <th>Source</th>
+      <th>Sink / Location</th>
+      <th>Key Technique</th>
+    </tr>
+    <tr>
+      <td>Reflected XSS</td>
+      <td>Reflected</td>
+      <td>Search input</td>
+      <td>HTML response</td>
+      <td>Inject HTML directly</td>
+    </tr>
+    <tr>
+      <td>Stored XSS</td>
+      <td>Stored</td>
+      <td>Comment input</td>
+      <td>Stored HTML content</td>
+      <td>Inject persistent HTML</td>
+    </tr>
+    <tr>
+      <td>document.write()</td>
+      <td>DOM XSS</td>
+      <td>location.search</td>
+      <td>document.write()</td>
+      <td>Escape attribute + inject element</td>
+    </tr>
+    <tr>
+      <td>innerHTML</td>
+      <td>DOM XSS</td>
+      <td>location.search</td>
+      <td>innerHTML</td>
+      <td>Inject HTML + event handler</td>
+    </tr>
+  </table>
+
+  <h2>7. The Payload Construction Method</h2>
+
+  <p>
+    A major lesson from these labs is that payload construction should be
+    <strong>context-driven</strong>.
+  </p>
+
+  <h3>Step 1 — Find the Source</h3>
+
+  <p>Look for attacker-controlled data such as:</p>
+
+  <pre>
+location.search
+location.hash
+location.href
+document.URL
+form input
+query parameters
+stored comments
+profile fields</pre>
+
+  <h3>Step 2 — Find the Sink</h3>
+
+  <p>Look for dangerous operations such as:</p>
+
+  <pre>
+innerHTML
+outerHTML
+document.write()
+insertAdjacentHTML()
+eval()
+setTimeout()</pre>
+
+  <h3>Step 3 — Determine the Context</h3>
+
+  <p>Ask where your input appears:</p>
+
+  <pre>
+HTML text?
+HTML attribute?
+JavaScript string?
+JavaScript code?
+URL?
+CSS?</pre>
+
+  <h3>Step 4 — Determine What Must Be Escaped</h3>
+
+  <p>
+    If your input appears inside a quoted attribute, you may first need to
+    escape the quotation mark.
+  </p>
+
+  <p>
+    If your input is already interpreted as HTML, you may be able to introduce
+    an element directly.
+  </p>
+
+  <h3>Step 5 — Choose an Execution Mechanism</h3>
+
+  <p>
+    The execution mechanism depends on what the browser will accept in that
+    context. Examples studied in these labs include:
+  </p>
+
+  <pre>
+&lt;script&gt;...&lt;/script&gt;
+
+event handlers such as:
+onerror=
+onload=</pre>
+
+  <h3>Step 6 — Prove Execution Safely</h3>
+
+  <p>
+    In PortSwigger labs, <code>alert(1)</code> is deliberately used as a
+    harmless proof of JavaScript execution.
+  </p>
+
+  <div class="success">
+    <strong>Professional mindset:</strong>
+    Do not begin by asking "What payload bypasses this?"
+    Begin by asking "What parser is interpreting my input?"
+  </div>
+
+  <h2>8. Why XSS Is Dangerous in Real Applications</h2>
+
+  <p>
+    In these labs, the goal is simply to trigger <code>alert(1)</code>.
+    In a real application, an attacker could potentially execute JavaScript
+    with the privileges of the vulnerable origin.
+  </p>
+
+  <h3>Potential Impact</h3>
+
+  <ul>
+    <li>Modify page content presented to the victim.</li>
+    <li>Perform actions using the victim's authenticated browser session.</li>
+    <li>Read sensitive information available to JavaScript on the page.</li>
+    <li>Modify forms or redirect users to attacker-controlled destinations.</li>
+    <li>Display convincing phishing interfaces inside a trusted origin.</li>
+    <li>Interact with application APIs using the victim's browser context.</li>
+  </ul>
+
+  <div class="danger">
+    <strong>Important distinction:</strong>
+    XSS does not automatically mean "the attacker can steal every cookie."
+    Modern defenses such as HttpOnly cookies, SameSite settings, CSP, and
+    browser isolation can limit particular attack paths. The fundamental
+    problem is that attacker-controlled JavaScript is executing in a trusted
+    origin.
+  </div>
+
+  <h2>9. Real-World XSS Attack Scenarios</h2>
+
+  <h3>Scenario A — Reflected XSS</h3>
+
+  <p>
+    Imagine an application that reflects a search parameter directly into its
+    response:
+  </p>
+
+  <pre>
+https://example.com/search?q=USER_INPUT</pre>
+
+  <p>
+    If the application inserts that value into HTML without appropriate
+    encoding, an attacker could attempt to construct a URL that causes
+    JavaScript execution when a victim visits it.
+  </p>
+
+  <p>
+    This is why reflected XSS frequently appears in phishing-style attack
+    chains: the malicious content can be delivered through a crafted link.
+  </p>
+
+  <h3>Scenario B — Stored XSS</h3>
+
+  <p>
+    Consider a forum, support system, social platform, CMS, or admin dashboard
+    where users can submit content.
+  </p>
+
+  <pre>
+Attacker
+   ↓
+Malicious content
+   ↓
+Application database
+   ↓
+Victim views content
+   ↓
+Browser renders malicious content</pre>
+
+  <p>
+    Stored XSS can have a larger blast radius because multiple users may
+    encounter the malicious content.
+  </p>
+
+  <h3>Scenario C — DOM XSS</h3>
+
+  <p>
+    A modern single-page application might retrieve information from the URL
+    and dynamically place it into the DOM.
+  </p>
+
+  <pre>
+URL
+ ↓
+location.search
+ ↓
+JavaScript
+ ↓
+innerHTML
+ ↓
+DOM</pre>
+
+  <p>
+    The server may never see the malicious value. This is why DOM XSS can be
+    missed if testing focuses exclusively on server responses.
+  </p>
+
+  <h2>10. How Developers Defend Against XSS</h2>
+
+  <h3>1. Prefer Safe DOM APIs</h3>
+
+  <p>Instead of:</p>
+
+  <pre>
+element.innerHTML = userInput;</pre>
+
+  <p>prefer:</p>
+
+  <pre>
+element.textContent = userInput;</pre>
+
+  <p>
+    <code>textContent</code> treats the value as text rather than parsing it
+    as HTML.
+  </p>
+
+  <h3>2. Context-Aware Output Encoding</h3>
+
+  <p>
+    Output should be encoded according to where it is inserted.
+    HTML, HTML attributes, JavaScript, CSS, and URLs have different parsing
+    rules.
+  </p>
+
+  <p>
+    A common mistake is assuming that one generic "escape" function is safe
+    everywhere.
+  </p>
+
+  <h3>3. Avoid Dangerous DOM Sinks</h3>
+
+  <p>Be especially careful with:</p>
+
+  <pre>
+innerHTML
+outerHTML
+document.write()
+insertAdjacentHTML()
+eval()</pre>
+
+  <h3>4. Sanitize HTML When HTML Is Actually Required</h3>
+
+  <p>
+    If an application genuinely needs to allow users to submit HTML,
+    sanitization should remove dangerous constructs while preserving the
+    allowed formatting.
+  </p>
+
+  <h3>5. Use Content Security Policy</h3>
+
+  <p>
+    A strong CSP can significantly reduce the impact of XSS by restricting
+    where scripts can come from and, when configured appropriately, blocking
+    inline script execution.
+  </p>
+
+  <h3>6. Protect Cookies</h3>
+
+  <p>
+    Authentication cookies should generally use security attributes such as
+    <code>HttpOnly</code>, <code>Secure</code>, and appropriate
+    <code>SameSite</code> settings.
+  </p>
+
+  <p>
+    HttpOnly is particularly useful because it prevents JavaScript from
+    directly reading the cookie value.
+  </p>
+
+  <h3>7. Framework Protections</h3>
+
+  <p>
+    Modern frameworks such as React generally escape interpolated values by
+    default. Developers can accidentally bypass these protections when using
+    mechanisms such as raw HTML rendering.
+  </p>
+
+  <pre>
+Dangerous pattern:
+
+dangerouslySetInnerHTML
+
+Always question why raw HTML is necessary.</pre>
+
+  <h2>11. Testing XSS in Real-Life Security Work</h2>
+
+  <div class="warning">
+    <strong>Only test applications you own or have explicit authorization to
+    assess.</strong>
+  </div>
+
+  <p>
+    A professional XSS assessment can follow this methodology:
+  </p>
+
+  <ol>
+    <li>Map input points.</li>
+    <li>Identify reflected and stored data.</li>
+    <li>Inspect the DOM and JavaScript.</li>
+    <li>Identify sources and sinks.</li>
+    <li>Determine the injection context.</li>
+    <li>Use harmless canary values.</li>
+    <li>Construct a minimal proof-of-concept.</li>
+    <li>Demonstrate impact without accessing unnecessary data.</li>
+    <li>Document the vulnerable code path.</li>
+    <li>Recommend a context-appropriate fix.</li>
+  </ol>
+
+  <h2>12. What I Have Learned From These Four Labs</h2>
+
+  <table>
+    <tr>
+      <th>Concept</th>
+      <th>What the labs taught me</th>
+    </tr>
+    <tr>
+      <td>Reflected XSS</td>
+      <td>
+        User input can become executable HTML when reflected into a response
+        without appropriate encoding.
+      </td>
+    </tr>
+    <tr>
+      <td>Stored XSS</td>
+      <td>
+        Malicious input can persist in application storage and execute when
+        another user views the affected content.
+      </td>
+    </tr>
+    <tr>
+      <td>DOM XSS</td>
+      <td>
+        Client-side JavaScript can introduce XSS even when the server itself
+        does not directly reflect the malicious input.
+      </td>
+    </tr>
+    <tr>
+      <td>document.write()</td>
+      <td>
+        Understanding the exact HTML context is essential because the payload
+        may need to escape an existing attribute before introducing new markup.
+      </td>
+    </tr>
+    <tr>
+      <td>innerHTML</td>
+      <td>
+        HTML parsing can turn attacker-controlled strings into actual DOM
+        elements, including elements with event handlers.
+      </td>
+    </tr>
+    <tr>
+      <td>Payload construction</td>
+      <td>
+        Payloads should be constructed from the source, sink, and injection
+        context rather than memorised as isolated strings.
+      </td>
+    </tr>
+  </table>
+
+  <h2>13. My XSS Investigation Checklist</h2>
+
+  <pre>
+[ ] Identify the input/source
+
+[ ] Determine whether it is reflected, stored, or DOM-based
+
+[ ] Locate the sink
+
+[ ] Inspect the resulting HTML/DOM
+
+[ ] Determine the exact injection context
+
+[ ] Insert a harmless canary
+
+[ ] Determine whether HTML is being parsed
+
+[ ] Determine what characters must be escaped
+
+[ ] Construct the smallest possible proof-of-concept
+
+[ ] Verify JavaScript execution safely
+
+[ ] Understand the potential impact
+
+[ ] Identify the appropriate defensive fix</pre>
+
+  <h2>14. Final Takeaway</h2>
+
+  <div class="success">
+    <p>
+      <strong>
+        The most important thing I have learned from these XSS labs is not
+        the payload itself — it is how to reason about the browser's parser.
+      </strong>
+    </p>
+
+    <p>
+      The same <code>alert(1)</code> objective can require completely different
+      payload structures depending on whether the attacker-controlled value
+      appears in HTML text, an HTML attribute, JavaScript, a URL, or another
+      execution context.
+    </p>
+
+    <p>
+      My methodology should therefore be:
+    </p>
+
+    <pre>
+SOURCE
+↓
+SINK
+↓
+CONTEXT
+↓
+ESCAPE / BREAK CONTEXT
+↓
+CONTROLLED HTML / JS
+↓
+PROOF OF EXECUTION
+↓
+IMPACT
+↓
+REMEDIATION</pre>
+
+    <p>
+      This approach is more valuable than memorising a list of XSS payloads
+      because it can be applied to unfamiliar applications and different
+      vulnerability contexts.
+    </p>
+  </div>
+
+</body>
+</html>

