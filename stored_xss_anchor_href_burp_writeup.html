@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stored XSS into Anchor href Attribute - Burp Suite Writeup</title>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--text:#172033;--muted:#5d687d;--accent:#2563eb;--border:#dce3ef;--code:#101827;--codeText:#e5edf8;--success:#087443}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,Helvetica,sans-serif;line-height:1.65}
+main{max-width:1050px;margin:0 auto;padding:32px 20px 70px}
+header{background:linear-gradient(135deg,#172554,#2563eb);color:white;padding:38px;border-radius:18px;margin-bottom:26px}
+h1{font-size:clamp(28px,5vw,46px);line-height:1.12;margin:0 0 14px}h2{margin-top:36px;color:#173b83}h3{margin-top:26px;color:#244b91}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;margin:18px 0;box-shadow:0 4px 16px #1e293b0b}
+.badge{display:inline-block;background:#dbeafe;color:#1d4ed8;padding:4px 10px;border-radius:999px;font-size:13px;font-weight:bold;margin:3px}
+.note{border-left:5px solid var(--accent);background:#eff6ff;padding:14px 18px;border-radius:8px}
+.success{border-left:5px solid var(--success);background:#ecfdf5;padding:14px 18px;border-radius:8px}
+.warning{border-left:5px solid #d97706;background:#fffbeb;padding:14px 18px;border-radius:8px}
+pre{background:var(--code);color:var(--codeText);padding:18px;border-radius:10px;overflow:auto;font-size:14px;line-height:1.5}
+code{font-family:Consolas,Monaco,monospace}p code,li code,td code{background:#eef2f7;color:#172033;padding:2px 5px;border-radius:4px}
+table{width:100%;border-collapse:collapse;margin:15px 0}th,td{border:1px solid var(--border);padding:11px;text-align:left;vertical-align:top}th{background:#eff6ff}
+li{margin:7px 0}.flow{display:grid;gap:10px}.step{padding:15px;border:1px solid var(--border);border-radius:10px;background:#f8fafc}.arrow{text-align:center;color:var(--accent);font-weight:bold}
+footer{margin-top:35px;color:var(--muted);font-size:14px}
+@media print{body{background:white}.card,header{box-shadow:none;break-inside:avoid}main{max-width:none;padding:0}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<div><span class="badge">PortSwigger Apprentice</span><span class="badge">Stored XSS</span><span class="badge">Burp Suite</span></div>
+<h1>Stored XSS into Anchor href Attribute with Double Quotes HTML-Encoded</h1>
+<p>A practical, beginner-friendly writeup for understanding the vulnerability, reproducing it with Burp Suite, and developing a reusable XSS investigation methodology.</p>
+</header>
+
+<section class="card">
+<h2>1. Lab objective</h2>
+<p>The application contains a comment feature with a Website input. The submitted Website value is stored and later inserted into the author’s anchor element.</p>
+<p>The goal is to submit a comment that causes <code>alert(1)</code> to execute when the comment author’s name is clicked.</p>
+<div class="success"><strong>Core lesson:</strong> Identify where your input lands, understand how the browser interprets that context, and choose a context-appropriate proof of concept.</div>
+</section>
+
+<section class="card">
+<h2>2. Understand the data flow</h2>
+<div class="flow">
+<div class="step"><strong>1. User input</strong><br>Website field receives a value such as <code>nic123abc</code>.</div>
+<div class="arrow">↓</div>
+<div class="step"><strong>2. HTTP request</strong><br>The browser submits the value in a form parameter.</div>
+<div class="arrow">↓</div>
+<div class="step"><strong>3. Server storage</strong><br>The application saves the comment and Website value.</div>
+<div class="arrow">↓</div>
+<div class="step"><strong>4. HTML rendering</strong><br>The saved value is placed inside an anchor’s <code>href</code>.</div>
+<div class="arrow">↓</div>
+<div class="step"><strong>5. Browser execution</strong><br>Clicking the link activates the JavaScript URL.</div>
+</div>
+</section>
+
+<section class="card">
+<h2>3. Reconnaissance: Start with a harmless marker</h2>
+<p>Do not begin by randomly trying complex payloads. First establish where the input is reflected.</p>
+<table>
+<tr><th>Field</th><th>Example</th></tr>
+<tr><td>Comment</td><td><code>Testing 123</code></td></tr>
+<tr><td>Name</td><td><code>nic</code></td></tr>
+<tr><td>Email</td><td><code>test@example.com</code></td></tr>
+<tr><td>Website</td><td><code>nic123abc</code></td></tr>
+</table>
+<p>Use a unique alphanumeric marker because it is easy to search for in Burp responses and page source.</p>
+<p>If the page later contains:</p>
+<pre>&lt;a id="author" href="nic123abc"&gt;nic&lt;/a&gt;</pre>
+<p>you have confirmed that your Website value is reflected inside an anchor URL attribute.</p>
+</section>
+
+<section class="card">
+<h2>4. Configure Burp Suite</h2>
+<ol>
+<li>Open Burp Suite.</li>
+<li>Go to <strong>Proxy → Intercept</strong>.</li>
+<li>Turn interception on.</li>
+<li>Open the PortSwigger lab in the browser.</li>
+<li>Submit a normal comment containing your unique Website marker.</li>
+<li>Inspect the intercepted request and locate the parameter containing your marker.</li>
+<li>Right-click the request and choose <strong>Send to Repeater</strong>.</li>
+</ol>
+<p>An illustrative request may look like this:</p>
+<pre>POST /post/comment HTTP/1.1
+Host: YOUR-LAB-ID.web-security-academy.net
+Content-Type: application/x-www-form-urlencoded
+
+csrf=TOKEN&postId=1&comment=Testing+123&name=nic&email=test%40example.com&website=nic123abc</pre>
+<p><strong>Note:</strong> Your actual endpoint, parameters, CSRF token, and host will differ. Use the request captured from your own lab.</p>
+</section>
+
+<section class="card">
+<h2>5. Inspect the stored response</h2>
+<p>The comment submission response may not contain the saved comment. Make a second request to view the blog post, intercept it, and send it to another Repeater tab.</p>
+<p>Search the response for your unique marker:</p>
+<pre>nic123abc</pre>
+<p>You may find:</p>
+<pre>&lt;section class="comment"&gt;
+    &lt;p&gt;
+        &lt;img src="/resources/images/avatarDefault.svg" class="avatar"&gt;
+        &lt;a id="author" href="nic123abc"&gt;nic&lt;/a&gt;
+        | 15 September 2026
+    &lt;/p&gt;
+    &lt;p&gt;Testing 123&lt;/p&gt;
+    &lt;p&gt;&lt;/p&gt;
+&lt;/section&gt;</pre>
+<p>The important discovery is that the value appears in:</p>
+<pre>&lt;a href="USER_INPUT"&gt;nic&lt;/a&gt;</pre>
+<p>That is an <strong>anchor URL attribute context</strong>, not ordinary HTML text and not necessarily JavaScript source code.</p>
+</section>
+
+<section class="card">
+<h2>6. Why the lab title mentions double quotes being HTML-encoded</h2>
+<p>The application may encode a submitted quote as <code>&amp;quot;</code>. This prevents the quote from acting as a new HTML attribute delimiter.</p>
+<p>For example, an attempted injection might be rendered as:</p>
+<pre>&lt;a href="&amp;quot; onmouseover=&amp;quot;alert(1)"&gt;nic&lt;/a&gt;</pre>
+<p>The encoded quote is treated as data inside the attribute value rather than as the end of the attribute.</p>
+<div class="note"><strong>Important insight:</strong> You do not always need to break out of an HTML attribute. If your input is already being interpreted as a URL, the URL scheme itself may be the relevant attack surface.</div>
+</section>
+
+<section class="card">
+<h2>7. Understand the payload</h2>
+<pre>javascript:alert(1)</pre>
+<table>
+<tr><th>Part</th><th>Meaning</th></tr>
+<tr><td><code>javascript:</code></td><td>A URL scheme that can execute JavaScript when the link is activated, where permitted by the browser and security policy.</td></tr>
+<tr><td><code>alert(1)</code></td><td>A visible JavaScript proof of execution.</td></tr>
+</table>
+<p>When the application renders:</p>
+<pre>&lt;a id="author" href="javascript:alert(1)"&gt;nic&lt;/a&gt;</pre>
+<p>the browser treats the anchor destination as a JavaScript URL. Clicking the author name can therefore execute the payload.</p>
+<p>A payload such as <code>&lt;script&gt;alert(1)&lt;/script&gt;</code> is not the natural first choice here because the input is inside an <code>href</code> attribute, not inserted as HTML content.</p>
+</section>
+
+<section class="card">
+<h2>8. Reproduce the lab in Burp Repeater</h2>
+<ol>
+<li>Return to the comment submission request in Repeater.</li>
+<li>Replace the Website value <code>nic123abc</code> with <code>javascript:alert(1)</code>.</li>
+<li>When represented as URL-encoded form data, it may appear as:</li>
+</ol>
+<pre>website=javascript%3Aalert%281%29</pre>
+<p>The decoded value is:</p>
+<pre>javascript:alert(1)</pre>
+<p>Send the request. Then return to the blog post and refresh or revisit the page to load the stored comment.</p>
+</section>
+
+<section class="card">
+<h2>9. Confirm the stored HTML</h2>
+<p>Inspect the author link. The expected result is similar to:</p>
+<pre>&lt;a id="author" href="javascript:alert(1)"&gt;nic&lt;/a&gt;</pre>
+<p>Your observed output was:</p>
+<pre>&lt;section class="comment"&gt;
+    &lt;p&gt;
+        &lt;img src="/resources/images/avatarDefault.svg" class="avatar"&gt;
+        &lt;a id="author" href="javascript:alert(1)"&gt;nic&lt;/a&gt; | 15 September 2026
+    &lt;/p&gt;
+    &lt;p&gt;javascript:alert(1)&lt;/p&gt;
+    &lt;p&gt;&lt;/p&gt;
+&lt;/section&gt;</pre>
+<p>The comment body displaying the payload is not the execution proof. The important reflection is the author anchor’s <code>href</code>.</p>
+</section>
+
+<section class="card">
+<h2>10. Verify execution</h2>
+<ol>
+<li>Right-click the author name.</li>
+<li>Select <strong>Copy Link Address</strong> or <strong>Copy URL</strong>, depending on the browser.</li>
+<li>Paste the copied destination somewhere safe to inspect it.</li>
+<li>Confirm that the destination is <code>javascript:alert(1)</code>.</li>
+<li>Click the author name.</li>
+<li>Observe the alert dialog containing <code>1</code>.</li>
+</ol>
+<div class="success"><strong>Successful verification:</strong> The author link activates the JavaScript URL and displays the alert dialog. This satisfies the lab objective.</div>
+</section>
+
+<section class="card">
+<h2>11. A reusable XSS investigation method</h2>
+<ol>
+<li><strong>Map the application:</strong> Identify pages, forms, parameters, and user-controlled fields.</li>
+<li><strong>Insert a unique marker:</strong> Use a random value such as <code>nic123abc</code>.</li>
+<li><strong>Intercept with Burp:</strong> Find the HTTP parameter carrying the marker.</li>
+<li><strong>Follow the data:</strong> Search responses and the DOM for the marker.</li>
+<li><strong>Classify the context:</strong> HTML text, HTML attribute, JavaScript string, URL, or DOM sink.</li>
+<li><strong>Study transformations:</strong> Check encoding, filtering, sanitization, and decoding.</li>
+<li><strong>Choose a context-specific proof:</strong> Use a harmless payload appropriate to the authorized lab.</li>
+<li><strong>Verify the exact sink:</strong> Confirm which element or operation causes execution.</li>
+<li><strong>Record the finding:</strong> Write down source, parameter, reflection, context, sink, payload, and impact.</li>
+</ol>
+</section>
+
+<section class="card">
+<h2>12. Common XSS contexts</h2>
+<table>
+<tr><th>Context</th><th>Example</th><th>Investigation focus</th></tr>
+<tr><td>HTML text</td><td><code>&lt;p&gt;USER_INPUT&lt;/p&gt;</code></td><td>Can markup be interpreted?</td></tr>
+<tr><td>HTML attribute</td><td><code>&lt;input value="USER_INPUT"&gt;</code></td><td>Are quotes encoded? Can the attribute be escaped?</td></tr>
+<tr><td>Anchor URL</td><td><code>&lt;a href="USER_INPUT"&gt;</code></td><td>Is the URL scheme validated?</td></tr>
+<tr><td>JavaScript string</td><td><code>const x = "USER_INPUT";</code></td><td>How are quotes and escapes handled?</td></tr>
+<tr><td>DOM sink</td><td><code>element.innerHTML = value</code></td><td>Where does the value originate and how is it inserted?</td></tr>
+</table>
+</section>
+
+<section class="card">
+<h2>13. Reflected XSS vs stored XSS</h2>
+<table>
+<tr><th>Reflected XSS</th><th>Stored XSS</th></tr>
+<tr><td>Payload is sent in a request and reflected in the immediate response.</td><td>Payload is saved and later served to users viewing the affected content.</td></tr>
+<tr><td>Often requires a victim to visit a crafted URL or submit a request.</td><td>May affect multiple users who view the stored content.</td></tr>
+<tr><td>Typical flow: request → response → browser.</td><td>Typical flow: submission → storage → later view → browser.</td></tr>
+</table>
+</section>
+
+<section class="card">
+<h2>14. Inspecting the anchor and scripts</h2>
+<h3>Inspect the anchor in DevTools</h3>
+<ol>
+<li>Right-click the author name.</li>
+<li>Select <strong>Inspect</strong>.</li>
+<li>Find the <code>&lt;a&gt;</code> element.</li>
+<li>Examine its <code>href</code> attribute.</li>
+</ol>
+<h3>Inspect the raw response in Burp</h3>
+<p>Compare the server response with the final DOM. This helps distinguish server-side rendering from client-side JavaScript manipulation.</p>
+<h3>Inspect JavaScript files</h3>
+<p>In DevTools → Sources, look for code that reads the Website field, builds comment markup, assigns <code>href</code>, uses <code>innerHTML</code>, or handles click events.</p>
+<div class="note"><strong>Do not assume:</strong> The presence of a script file does not automatically mean it caused the vulnerability. In this lab, the decisive evidence is the stored value becoming the anchor destination.</div>
+</section>
+
+<section class="card">
+<h2>15. Common beginner mistakes</h2>
+<ul>
+<li><strong>Starting with a script tag:</strong> It may not execute when placed inside an attribute.</li>
+<li><strong>Trying to escape with quotes immediately:</strong> Quotes may be HTML-encoded.</li>
+<li><strong>Focusing only on the comment body:</strong> Text inside a paragraph is not automatically executable.</li>
+<li><strong>Inspecting only the submission response:</strong> The stored comment may appear only when viewing the post.</li>
+<li><strong>Assuming every href is safe:</strong> URL schemes matter.</li>
+<li><strong>Using a payload without understanding it:</strong> Every payload should have a reason tied to the sink and context.</li>
+</ul>
+</section>
+
+<section class="card">
+<h2>16. Defensive lessons for developers</h2>
+<p>An application should not blindly trust a Website field.</p>
+<h3>Unsafe pattern</h3>
+<pre>const html = `
+  &lt;a href="${website}"&gt;${name}&lt;/a&gt;
+`;</pre>
+<h3>Validate allowed URL schemes</h3>
+<pre>function isSafeWebsite(value: string): boolean {
+  try {
+    const url = new URL(value);
+
+    return url.protocol === "http:" ||
+           url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}</pre>
+<p>This is an example of URL scheme validation, not a complete production security policy.</p>
+<h3>Prefer safe DOM APIs</h3>
+<pre>const link = document.createElement("a");
+
+link.textContent = name;
+link.href = safeWebsite;
+
+container.appendChild(link);</pre>
+<p>Additional defenses include server-side validation, context-appropriate output encoding, avoiding untrusted HTML in <code>innerHTML</code>, applying a suitable Content Security Policy, and safely rendering stored comments.</p>
+</section>
+
+<section class="card">
+<h2>17. Lab report summary</h2>
+<table>
+<tr><th>Item</th><th>Finding</th></tr>
+<tr><td>Category</td><td>Stored cross-site scripting</td></tr>
+<tr><td>Input</td><td>Website field in the comment form</td></tr>
+<tr><td>Storage</td><td>Server stores the submitted comment</td></tr>
+<tr><td>Reflection</td><td><code>href</code> attribute of the author anchor</td></tr>
+<tr><td>Payload</td><td><code>javascript:alert(1)</code></td></tr>
+<tr><td>Sink</td><td>Anchor URL activated on click</td></tr>
+<tr><td>Verification</td><td>Click author name and observe alert</td></tr>
+</table>
+</section>
+
+<section class="card">
+<h2>18. Your five-line note for future labs</h2>
+<pre>Source:       Where did my input enter?
+Parameter:    What HTTP field carried it?
+Reflection:   Where did the input appear?
+Context:      HTML, attribute, JS, URL, or DOM?
+Sink:         What causes the browser to interpret it?</pre>
+<p>For this lab:</p>
+<pre>Source:       Website input
+Parameter:    website
+Reflection:   &lt;a href="..."&gt;
+Context:      Anchor URL attribute
+Sink:         JavaScript URL activated on click</pre>
+</section>
+
+<footer>
+<p>Use these techniques only in PortSwigger Web Security Academy, your own applications, or systems where you have explicit authorization to test.</p>
+<p>Prepared as a learning writeup based on the completed lab and observed HTML.</p>
+</footer>
+</main>
+</body>
+</html>

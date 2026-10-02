@@ -1,0 +1,1548 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>PortSwigger Lab Writeup | Reflected XSS into a JavaScript String</title>
+
+    <style>
+        :root {
+            --bg: #f4f7fb;
+            --surface: #ffffff;
+            --text: #1f2937;
+            --muted: #64748b;
+            --border: #e2e8f0;
+            --primary: #2563eb;
+            --primary-light: #eff6ff;
+            --green: #15803d;
+            --green-light: #f0fdf4;
+            --orange: #c2410c;
+            --orange-light: #fff7ed;
+            --code-bg: #0f172a;
+            --code-text: #e2e8f0;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+        }
+
+        .container {
+            width: min(100% - 32px, 1100px);
+            margin: 0 auto;
+        }
+
+        header {
+            background: #0f172a;
+            color: white;
+            padding: 56px 0 48px;
+        }
+
+        header h1 {
+            max-width: 850px;
+            margin: 16px 0;
+            font-size: clamp(28px, 4vw, 46px);
+            line-height: 1.2;
+        }
+
+        header p {
+            max-width: 800px;
+            color: #cbd5e1;
+            font-size: 18px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 999px;
+            background: #1d4ed8;
+            color: white;
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        .badge.green {
+            background: #166534;
+        }
+
+        main {
+            padding: 36px 0 70px;
+        }
+
+        section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 28px;
+            margin-bottom: 26px;
+        }
+
+        h2 {
+            font-size: 26px;
+            margin: 0 0 18px;
+            color: #0f172a;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 12px;
+        }
+
+        h3 {
+            color: #1e3a8a;
+            margin-top: 28px;
+            font-size: 20px;
+        }
+
+        h4 {
+            margin-bottom: 8px;
+        }
+
+        p {
+            margin: 12px 0;
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        .callout {
+            border-left: 4px solid var(--primary);
+            background: var(--primary-light);
+            padding: 16px 18px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .success {
+            border-left-color: var(--green);
+            background: var(--green-light);
+        }
+
+        .warning {
+            border-left-color: var(--orange);
+            background: var(--orange-light);
+        }
+
+        .code-label {
+            display: block;
+            color: #475569;
+            font-size: 13px;
+            font-weight: bold;
+            margin-top: 18px;
+            margin-bottom: 6px;
+        }
+
+        pre {
+            background: var(--code-bg);
+            color: var(--code-text);
+            padding: 20px;
+            border-radius: 9px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        code {
+            font-family: Consolas, Monaco, monospace;
+            font-size: 0.92em;
+        }
+
+        p code,
+        li code,
+        td code {
+            background: #f1f5f9;
+            color: #9f1239;
+            padding: 2px 5px;
+            border-radius: 4px;
+        }
+
+        pre code {
+            background: transparent;
+            color: inherit;
+            padding: 0;
+        }
+
+        .payload {
+            font-size: 20px;
+            text-align: center;
+            background: #111827;
+            color: #86efac;
+            padding: 24px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+
+        .payload code {
+            color: inherit;
+            background: transparent;
+            font-size: inherit;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 18px 0;
+            min-width: 450px;
+        }
+
+        th,
+        td {
+            border: 1px solid var(--border);
+            padding: 12px 14px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            background: #f8fafc;
+            color: #334155;
+        }
+
+        tr:nth-child(even) td {
+            background: #fafafa;
+        }
+
+        ul,
+        ol {
+            padding-left: 25px;
+        }
+
+        li {
+            margin: 8px 0;
+        }
+
+        .step {
+            display: grid;
+            grid-template-columns: 42px 1fr;
+            gap: 15px;
+            margin: 24px 0;
+        }
+
+        .step-number {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #dbeafe;
+            color: #1d4ed8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .step-content h3 {
+            margin: 0 0 8px;
+        }
+
+        .step-content p {
+            margin-top: 4px;
+        }
+
+        .diagram {
+            border: 1px dashed #94a3b8;
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .diagram .arrow {
+            font-size: 24px;
+            color: #64748b;
+            margin: 6px 0;
+        }
+
+        .diagram .box {
+            background: white;
+            border: 1px solid #cbd5e1;
+            padding: 12px;
+            border-radius: 8px;
+            font-family: Consolas, monospace;
+            overflow-wrap: anywhere;
+        }
+
+        .two-column {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 20px;
+        }
+
+        .mini-card {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 18px;
+        }
+
+        .mini-card h3 {
+            margin-top: 0;
+        }
+
+        .checklist li::marker {
+            color: var(--green);
+        }
+
+        footer {
+            text-align: center;
+            color: var(--muted);
+            padding: 20px;
+            font-size: 14px;
+        }
+
+        @media (max-width: 700px) {
+            section {
+                padding: 20px;
+            }
+
+            .two-column {
+                grid-template-columns: 1fr;
+            }
+
+            .step {
+                grid-template-columns: 32px 1fr;
+                gap: 10px;
+            }
+
+            .step-number {
+                width: 30px;
+                height: 30px;
+            }
+
+            header {
+                padding: 36px 0;
+            }
+        }
+
+        @media print {
+            body {
+                background: white;
+            }
+
+            header {
+                background: white;
+                color: black;
+                padding: 20px 0;
+            }
+
+            header p {
+                color: #333;
+            }
+
+            section {
+                break-inside: avoid;
+                box-shadow: none;
+            }
+
+            pre {
+                white-space: pre-wrap;
+                color: black;
+                background: #f1f5f9;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <div class="container">
+        <span class="badge">PortSwigger Web Security Academy</span>
+        <h1>Reflected XSS into a JavaScript String with Angle Brackets HTML Encoded</h1>
+        <p>
+            A practical walkthrough of identifying a JavaScript string injection
+            vulnerability, analyzing reflection in Burp Suite, understanding
+            JavaScript function calls, and constructing a working XSS payload.
+        </p>
+        <span class="badge green">Difficulty: Apprentice</span>
+    </div>
+</header>
+
+<main class="container">
+
+    <!-- Overview -->
+    <section>
+        <h2>1. Lab Overview</h2>
+
+        <p>
+            This lab demonstrates a reflected Cross-Site Scripting (XSS)
+            vulnerability in a blog's search functionality.
+        </p>
+
+        <p>
+            The application reflects the user's search input inside a
+            JavaScript string used by the search tracking functionality.
+            Although angle brackets are HTML encoded, the application does
+            not safely handle the JavaScript string context.
+        </p>
+
+        <div class="callout">
+            <strong>Core vulnerability:</strong>
+            User-controlled input is inserted into a JavaScript string without
+            safely preventing the input from breaking out of that string.
+        </div>
+
+        <div class="table-wrapper">
+            <table>
+                <tr>
+                    <th>Field</th>
+                    <th>Details</th>
+                </tr>
+                <tr>
+                    <td>Platform</td>
+                    <td>PortSwigger Web Security Academy</td>
+                </tr>
+                <tr>
+                    <td>Lab</td>
+                    <td>Reflected XSS into a JavaScript string with angle brackets HTML encoded</td>
+                </tr>
+                <tr>
+                    <td>Difficulty</td>
+                    <td>Apprentice</td>
+                </tr>
+                <tr>
+                    <td>Vulnerability</td>
+                    <td>Reflected Cross-Site Scripting (XSS)</td>
+                </tr>
+                <tr>
+                    <td>Injection context</td>
+                    <td>JavaScript string inside a script block</td>
+                </tr>
+                <tr>
+                    <td>Primary tool</td>
+                    <td>Burp Suite Repeater</td>
+                </tr>
+                <tr>
+                    <td>Goal</td>
+                    <td>Break out of the JavaScript string and execute alert()</td>
+                </tr>
+                <tr>
+                    <td>Status</td>
+                    <td>Solved</td>
+                </tr>
+            </table>
+        </div>
+    </section>
+
+    <!-- Objective -->
+    <section>
+        <h2>2. Lab Objective</h2>
+
+        <p>
+            The objective is to perform a reflected XSS attack that breaks
+            out of the JavaScript string containing the search term and
+            executes the JavaScript <code>alert</code> function.
+        </p>
+
+        <p>
+            The successful proof of concept is a browser alert popup.
+        </p>
+
+        <div class="callout success">
+            <strong>Success condition:</strong>
+            The browser executes the injected JavaScript and displays an
+            alert popup when the lab page is loaded with the crafted search
+            query.
+        </div>
+    </section>
+
+    <!-- Initial investigation -->
+    <section>
+        <h2>3. Initial Investigation and Reconnaissance</h2>
+
+        <p>
+            I started by interacting with the lab's search functionality.
+            The goal was to understand how the application handled and
+            reflected user input.
+        </p>
+
+        <h3>3.1 Submit a normal search term</h3>
+
+        <p>
+            I entered a random alphanumeric value into the search box.
+            For example:
+        </p>
+
+        <pre><code>Nicholas123</code></pre>
+
+        <p>
+            The server returned a page containing the search term in the
+            page's search results and tracking functionality.
+        </p>
+
+        <h3>3.2 Intercept the request with Burp Suite</h3>
+
+        <p>
+            I used Burp Suite to observe the HTTP request generated by the
+            search form and sent the request to Burp Repeater for further
+            testing.
+        </p>
+
+        <p>
+            The relevant request parameter was:
+        </p>
+
+        <pre><code>search=Nicholas123</code></pre>
+
+        <p>
+            The exact request path and other HTTP headers may vary depending
+            on the lab session.
+        </p>
+
+        <h3>3.3 Observe where the input is reflected</h3>
+
+        <p>
+            The response reflected my input inside a JavaScript variable.
+            This was the important discovery because the input was not only
+            being displayed as ordinary HTML text.
+        </p>
+
+        <pre><code>&lt;script&gt;
+    var searchTerms = 'Nicholas123';
+&lt;/script&gt;</code></pre>
+
+        <div class="callout">
+            <strong>Key observation:</strong>
+            The input is inside single quotes in a JavaScript string.
+            This changes the way the payload must be constructed.
+        </div>
+    </section>
+
+    <!-- Angle brackets -->
+    <section>
+        <h2>4. Testing Angle Brackets and Understanding HTML Encoding</h2>
+
+        <p>
+            During my initial troubleshooting, I experimented with angle
+            brackets because XSS is commonly associated with HTML elements
+            such as <code>&lt;script&gt;</code> or event-handler attributes.
+        </p>
+
+        <p>
+            However, the application returned angle brackets in encoded form.
+            This indicated that the application was applying HTML encoding
+            to those characters.
+        </p>
+
+        <h3>4.1 Example of HTML encoding</h3>
+
+        <div class="table-wrapper">
+            <table>
+                <tr>
+                    <th>Character</th>
+                    <th>Encoded representation</th>
+                </tr>
+                <tr>
+                    <td><code>&lt;</code></td>
+                    <td><code>&amp;lt;</code></td>
+                </tr>
+                <tr>
+                    <td><code>&gt;</code></td>
+                    <td><code>&amp;gt;</code></td>
+                </tr>
+                <tr>
+                    <td><code>&amp;</code></td>
+                    <td><code>&amp;amp;</code></td>
+                </tr>
+                <tr>
+                    <td><code>"</code></td>
+                    <td><code>&amp;quot;</code> in common HTML contexts</td>
+                </tr>
+                <tr>
+                    <td><code>'</code></td>
+                    <td><code>&amp;#39;</code> in common HTML contexts</td>
+                </tr>
+            </table>
+        </div>
+
+        <h3>4.2 Why this mattered</h3>
+
+        <p>
+            The angle brackets being encoded suggested that an HTML-tag-based
+            payload might not work in this location.
+        </p>
+
+        <p>
+            Instead of continuing to focus only on HTML tags, I inspected the
+            JavaScript context where the input was reflected.
+        </p>
+
+        <div class="callout warning">
+            <strong>Important lesson:</strong>
+            HTML encoding does not automatically make JavaScript string
+            interpolation safe. The correct analysis depends on the context
+            where the input is inserted.
+        </div>
+    </section>
+
+    <!-- Vulnerable code -->
+    <section>
+        <h2>5. Identifying the Vulnerable JavaScript</h2>
+
+        <p>
+            The relevant part of the response was:
+        </p>
+
+        <pre><code>&lt;script&gt;
+    var searchTerms = 'USER_INPUT';
+
+    document.write(
+        '&lt;img src="/resources/images/tracker.gif?searchTerms='
+        + encodeURIComponent(searchTerms)
+        + '"&gt;'
+    );
+&lt;/script&gt;</code></pre>
+
+        <p>
+            In this example, <code>USER_INPUT</code> represents the value
+            supplied through the search parameter.
+        </p>
+
+        <h3>5.1 Normal input</h3>
+
+        <p>
+            If the input is:
+        </p>
+
+        <pre><code>hello</code></pre>
+
+        <p>
+            The resulting JavaScript is:
+        </p>
+
+        <pre><code>var searchTerms = 'hello';</code></pre>
+
+        <p>
+            This is valid JavaScript. The search term is simply a string
+            assigned to the variable.
+        </p>
+
+        <h3>5.2 The vulnerable location</h3>
+
+        <p>
+            The application places the user's input between the opening and
+            closing single quotes:
+        </p>
+
+        <pre><code>var searchTerms = 'USER_INPUT';</code></pre>
+
+        <p>
+            Therefore, a single quote in the input can potentially interfere
+            with the string boundary.
+        </p>
+
+        <div class="callout">
+            <strong>Injection context:</strong>
+            JavaScript string delimited by single quotes.
+        </div>
+    </section>
+
+    <!-- JavaScript basics -->
+    <section>
+        <h2>6. Understanding alert(), alert(1), and alert("Nicholas")</h2>
+
+        <p>
+            One of the main things I learned from this lab was that
+            <code>alert(1)</code> is not a special XSS function.
+            It is simply a normal JavaScript function call.
+        </p>
+
+        <h3>6.1 What is alert()?</h3>
+
+        <p>
+            <code>alert</code> is a browser-provided JavaScript function
+            that displays a message in a dialog box.
+        </p>
+
+        <pre><code>alert();</code></pre>
+
+        <p>
+            This calls the function without providing a message.
+        </p>
+
+        <h3>6.2 What is alert(1)?</h3>
+
+        <pre><code>alert(1);</code></pre>
+
+        <p>
+            The value inside the parentheses is called an argument.
+            In this case, the argument is the number <code>1</code>.
+        </p>
+
+        <p>
+            The function displays the number as the alert message.
+        </p>
+
+        <h3>6.3 What is alert("Nicholas")?</h3>
+
+        <pre><code>alert("Nicholas");</code></pre>
+
+        <p>
+            Here, the argument is the string <code>"Nicholas"</code>.
+            The alert dialog displays that text.
+        </p>
+
+        <div class="table-wrapper">
+            <table>
+                <tr>
+                    <th>Expression</th>
+                    <th>Explanation</th>
+                </tr>
+                <tr>
+                    <td><code>alert()</code></td>
+                    <td>Call alert without an argument.</td>
+                </tr>
+                <tr>
+                    <td><code>alert(1)</code></td>
+                    <td>Call alert with the number 1.</td>
+                </tr>
+                <tr>
+                    <td><code>alert("Nicholas")</code></td>
+                    <td>Call alert with the text Nicholas.</td>
+                </tr>
+                <tr>
+                    <td><code>alert("XSS")</code></td>
+                    <td>Call alert with the text XSS.</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="callout success">
+            <strong>Key takeaway:</strong>
+            The number 1 is only the alert message. The XSS vulnerability
+            comes from getting JavaScript code to execute in an unintended
+            location.
+        </div>
+    </section>
+
+    <!-- Payload construction -->
+    <section>
+        <h2>7. Constructing the Payload</h2>
+
+        <p>
+            After identifying the JavaScript string context, I experimented
+            with a payload that could break out of the string and execute
+            JavaScript.
+        </p>
+
+        <h3>7.1 The successful payload</h3>
+
+        <div class="payload">
+            <code>'-alert(1)-'</code>
+        </div>
+
+        <p>
+            The payload consists of:
+        </p>
+
+        <pre><code>'
+-
+alert(1)
+-
+'</code></pre>
+
+        <h3>7.2 Payload with a custom alert message</h3>
+
+        <p>
+            During browser experimentation, I also observed that the
+            following variation executed successfully:
+        </p>
+
+        <div class="payload">
+            <code>'-alert("Nicholas")-'</code>
+        </div>
+
+        <p>
+            This works for the same reason as the original lab payload:
+            the alert function is evaluated as JavaScript code rather than
+            remaining inside the original string.
+        </p>
+
+        <div class="callout success">
+            <strong>Lab result:</strong>
+            Both the original solution using <code>alert(1)</code> and the
+            variation using <code>alert("Nicholas")</code> successfully
+            demonstrated JavaScript execution in the lab.
+        </div>
+    </section>
+
+    <!-- Breakdown -->
+    <section>
+        <h2>8. Breaking Down '-alert(1)-'</h2>
+
+        <p>
+            The most important part of this lab is understanding why the
+            payload is structured this way.
+        </p>
+
+        <h3>8.1 The original JavaScript</h3>
+
+        <pre><code>var searchTerms = 'USER_INPUT';</code></pre>
+
+        <p>
+            The application expects the search term to be a string.
+        </p>
+
+        <h3>8.2 After injecting the payload</h3>
+
+        <p>
+            When the payload is reflected, the JavaScript becomes:
+        </p>
+
+        <pre><code>var searchTerms = ''-alert(1)-'';</code></pre>
+
+        <p>
+            The two adjacent single quotes at the beginning and end are
+            important. They are not simply decorative characters.
+        </p>
+
+        <h3>8.3 First single quote: close the original string</h3>
+
+        <p>
+            The first single quote in the payload closes the string that
+            the application originally opened.
+        </p>
+
+        <pre><code>var searchTerms = ''</code></pre>
+
+        <p>
+            At this point, the original string is closed.
+        </p>
+
+        <h3>8.4 The minus operator</h3>
+
+        <p>
+            The minus sign is the JavaScript subtraction operator.
+            It allows the injected content to form part of an expression.
+        </p>
+
+        <pre><code>-alert(1)-</code></pre>
+
+        <p>
+            JavaScript evaluates the function call while evaluating the
+            expression.
+        </p>
+
+        <h3>8.5 alert(1): the function call</h3>
+
+        <pre><code>alert(1)</code></pre>
+
+        <p>
+            This is the actual JavaScript function call that produces the
+            browser alert.
+        </p>
+
+        <h3>8.6 Final single quote: complete the expression</h3>
+
+        <p>
+            The final single quote begins another string, which allows the
+            expression to fit into the surrounding JavaScript.
+        </p>
+
+        <pre><code>''</code></pre>
+
+        <h3>8.7 Complete breakdown</h3>
+
+        <div class="diagram">
+            <div class="box">
+                Original string closes
+                <br>
+                <strong>'</strong>
+            </div>
+
+            <div class="arrow">↓</div>
+
+            <div class="box">
+                JavaScript expression
+                <br>
+                <strong>-alert(1)-</strong>
+            </div>
+
+            <div class="arrow">↓</div>
+
+            <div class="box">
+                New string begins
+                <br>
+                <strong>'</strong>
+            </div>
+
+            <div class="arrow">↓</div>
+
+            <div class="box">
+                Browser evaluates the alert call
+            </div>
+        </div>
+
+        <div class="callout warning">
+            <strong>Precision:</strong>
+            The minus signs are not required because alert is an XSS-specific
+            function. They help construct a JavaScript expression that fits
+            the surrounding syntax in this lab.
+        </div>
+    </section>
+
+    <!-- Why not simple payload -->
+    <section>
+        <h2>9. Why Not Simply Use 'alert(1)'?</h2>
+
+        <p>
+            A natural first attempt might be:
+        </p>
+
+        <pre><code>'alert(1)'</code></pre>
+
+        <p>
+            When reflected into the vulnerable code, this becomes:
+        </p>
+
+        <pre><code>var searchTerms = ''alert(1)'';</code></pre>
+
+        <p>
+            This is not valid JavaScript syntax.
+        </p>
+
+        <p>
+            The string closes, but the remaining characters do not form a
+            valid expression in the surrounding code.
+        </p>
+
+        <h3>9.1 The role of the minus operators</h3>
+
+        <p>
+            The working payload is:
+        </p>
+
+        <pre><code>'-alert(1)-'</code></pre>
+
+        <p>
+            It becomes:
+        </p>
+
+        <pre><code>var searchTerms = ''-alert(1)-'';</code></pre>
+
+        <p>
+            The subtraction operators make the injected function call part
+            of a valid expression structure.
+        </p>
+
+        <p>
+            The key is not simply "insert alert". The key is to construct
+            JavaScript syntax that works with the code surrounding the
+            reflection point.
+        </p>
+    </section>
+
+    <!-- Burp workflow -->
+    <section>
+        <h2>10. Burp Suite Repeater Workflow</h2>
+
+        <p>
+            My Burp Suite workflow helped me identify the reflection point
+            and test the payload without repeatedly entering it into the
+            search form.
+        </p>
+
+        <div class="step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+                <h3>Submit a random search term</h3>
+                <p>
+                    Enter an alphanumeric string into the lab search box.
+                </p>
+                <pre><code>Nicholas123</code></pre>
+            </div>
+        </div>
+
+        <div class="step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+                <h3>Intercept the request</h3>
+                <p>
+                    Use Burp Proxy or browser integration to observe the
+                    search request.
+                </p>
+                <pre><code>GET /?search=Nicholas123 HTTP/1.1</code></pre>
+            </div>
+        </div>
+
+        <div class="step">
+            <div class="step-number">3</div>
+            <div class="step-content">
+                <h3>Send the request to Repeater</h3>
+                <p>
+                    Right-click the request and choose
+                    <strong>Send to Repeater</strong>.
+                </p>
+            </div>
+        </div>
+
+        <div class="step">
+            <div class="step-number">4</div>
+            <div class="step-content">
+                <h3>Inspect the response</h3>
+                <p>
+                    Search the response for your random string and identify
+                    whether it appears inside HTML, an attribute, or
+                    JavaScript.
+                </p>
+            </div>
+        </div>
+
+        <div class="step">
+            <div class="step-number">5</div>
+            <div class="step-content">
+                <h3>Test the payload</h3>
+                <p>
+                    Replace the search value with the lab payload.
+                </p>
+                <pre><code>'-alert(1)-'</code></pre>
+            </div>
+        </div>
+
+        <div class="step">
+            <div class="step-number">6</div>
+            <div class="step-content">
+                <h3>Send the request</h3>
+                <p>
+                    Click Send in Burp Repeater and inspect the response.
+                    Confirm that the input is reflected in the JavaScript
+                    string.
+                </p>
+            </div>
+        </div>
+
+        <div class="step">
+            <div class="step-number">7</div>
+            <div class="step-content">
+                <h3>Verify in the browser</h3>
+                <p>
+                    Use the lab's verification method to load the crafted
+                    URL in the browser and observe the alert popup.
+                </p>
+            </div>
+        </div>
+
+        <div class="callout">
+            <strong>Practical lesson:</strong>
+            Burp Repeater helps you inspect the response and refine the
+            payload. The browser is where you verify whether the reflected
+            JavaScript actually executes.
+        </div>
+    </section>
+
+    <!-- Full response -->
+    <section>
+        <h2>11. Observed Reflected Response</h2>
+
+        <p>
+            After testing the payload, the relevant part of the response
+            looked like this:
+        </p>
+
+        <pre><code>&lt;section class=blog-header&gt;
+    &lt;h1&gt;0 search results for '&amp;apos;-alert(1)-&amp;apos;'&lt;/h1&gt;
+    &lt;hr&gt;
+&lt;/section&gt;
+
+&lt;section class=search&gt;
+    &lt;form action=/ method=GET&gt;
+        &lt;input type=text
+               placeholder='Search the blog...'
+               name=search&gt;
+        &lt;button type=submit class=button&gt;
+            Search
+        &lt;/button&gt;
+    &lt;/form&gt;
+&lt;/section&gt;
+
+&lt;script&gt;
+    var searchTerms = ''-alert(1)-'';
+
+    document.write(
+        '&lt;img src="/resources/images/tracker.gif?searchTerms='
+        + encodeURIComponent(searchTerms)
+        + '"&gt;'
+    );
+&lt;/script&gt;
+
+&lt;section class="blog-list no-results"&gt;
+    &lt;div class=is-linkback&gt;
+        &lt;a href="/"&gt;Back to Blog&lt;/a&gt;
+    &lt;/div&gt;
+&lt;/section&gt;</code></pre>
+
+        <p>
+            The important distinction is between the search results heading
+            and the JavaScript variable.
+        </p>
+
+        <div class="two-column">
+            <div class="mini-card">
+                <h3>Search results heading</h3>
+                <p>
+                    The input appears as displayed text. HTML encoding can
+                    prevent markup from being interpreted as HTML.
+                </p>
+            </div>
+
+            <div class="mini-card">
+                <h3>JavaScript variable</h3>
+                <p>
+                    The input appears inside a JavaScript string. The
+                    relevant attack changes the JavaScript syntax.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Why XSS works -->
+    <section>
+        <h2>12. Why the XSS Works</h2>
+
+        <p>
+            The vulnerability exists because the application reflects
+            user-controlled input into JavaScript without correctly
+            handling the JavaScript string boundary.
+        </p>
+
+        <h3>12.1 Expected behavior</h3>
+
+        <pre><code>var searchTerms = 'hello';</code></pre>
+
+        <p>
+            The input is treated as data.
+        </p>
+
+        <h3>12.2 Vulnerable behavior</h3>
+
+        <pre><code>var searchTerms = ''-alert(1)-'';</code></pre>
+
+        <p>
+            The input changes the structure of the JavaScript expression.
+            The browser parses the injected function call as code.
+        </p>
+
+        <h3>12.3 The vulnerability is reflected XSS</h3>
+
+        <p>
+            The malicious input is supplied through an HTTP request and
+            reflected into the response. It is not stored permanently by
+            the application as part of the lab's attack.
+        </p>
+
+        <div class="callout">
+            <strong>Reflected XSS:</strong>
+            Malicious input is reflected by the server into a page and
+            executed by the victim's browser when the vulnerable page is
+            loaded.
+        </div>
+    </section>
+
+    <!-- Important distinction -->
+    <section>
+        <h2>13. Understanding the Tracking Function</h2>
+
+        <p>
+            The lab includes the following tracking code:
+        </p>
+
+        <pre><code>document.write(
+    '&lt;img src="/resources/images/tracker.gif?searchTerms='
+    + encodeURIComponent(searchTerms)
+    + '"&gt;'
+);</code></pre>
+
+        <p>
+            This code creates an image element whose URL contains the
+            search term.
+        </p>
+
+        <h3>13.1 What encodeURIComponent does</h3>
+
+        <p>
+            <code>encodeURIComponent()</code> encodes a value for use as
+            part of a URL component.
+        </p>
+
+        <pre><code>encodeURIComponent("hello world")</code></pre>
+
+        <p>
+            Produces a URL-encoded representation such as:
+        </p>
+
+        <pre><code>hello%20world</code></pre>
+
+        <h3>13.2 Why it does not fix the original vulnerability</h3>
+
+        <p>
+            The tracking URL encoding happens after the value has already
+            been assigned to the JavaScript variable.
+        </p>
+
+        <pre><code>var searchTerms = 'USER_INPUT';
+
+encodeURIComponent(searchTerms);</code></pre>
+
+        <p>
+            The dangerous operation is the initial insertion of the input
+            into the JavaScript string. Encoding the value later for a URL
+            does not retroactively make that earlier JavaScript assignment
+            safe.
+        </p>
+
+        <div class="callout warning">
+            <strong>Context matters:</strong>
+            URL encoding, HTML encoding, and JavaScript string escaping are
+            different operations. Encoding for one context does not
+            necessarily protect another context.
+        </div>
+    </section>
+
+    <!-- Failed attempts -->
+    <section>
+        <h2>14. Troubleshooting and Failed Attempts</h2>
+
+        <p>
+            During the lab, I initially experimented with angle brackets
+            and HTML-based payloads. They were not effective in the relevant
+            JavaScript string context.
+        </p>
+
+        <h3>14.1 Angle bracket payloads</h3>
+
+        <p>
+            Example:
+        </p>
+
+        <pre><code>&lt;script&gt;alert(1)&lt;/script&gt;</code></pre>
+
+        <p>
+            The application encoded angle brackets, so the input was not
+            interpreted as an HTML script element.
+        </p>
+
+        <h3>14.2 Simple quote payload</h3>
+
+        <p>
+            Example:
+        </p>
+
+        <pre><code>'alert(1)'</code></pre>
+
+        <p>
+            This did not produce valid JavaScript in the lab's surrounding
+            expression.
+        </p>
+
+        <h3>14.3 Successful payload</h3>
+
+        <pre><code>'-alert(1)-'</code></pre>
+
+        <p>
+            The successful payload closes the original string and places
+            the function call inside a JavaScript expression.
+        </p>
+
+        <div class="callout success">
+            <strong>What I learned from the failed attempts:</strong>
+            A payload must be designed for the exact context in which the
+            application reflects the input. A generic XSS payload may fail
+            even when a vulnerability exists.
+        </div>
+    </section>
+
+    <!-- Context methodology -->
+    <section>
+        <h2>15. A General XSS Context Identification Method</h2>
+
+        <p>
+            This lab helped me develop a more structured approach to
+            identifying reflected XSS vulnerabilities.
+        </p>
+
+        <ol>
+            <li>
+                <strong>Submit a unique marker.</strong>
+                <p>
+                    Use a random string so you can locate your input in
+                    the response.
+                </p>
+            </li>
+
+            <li>
+                <strong>Inspect the response.</strong>
+                <p>
+                    Find exactly where the marker appears.
+                </p>
+            </li>
+
+            <li>
+                <strong>Identify the context.</strong>
+                <p>
+                    Determine whether the input is inside HTML text, an
+                    HTML attribute, JavaScript, CSS, or another context.
+                </p>
+            </li>
+
+            <li>
+                <strong>Identify the delimiters.</strong>
+                <p>
+                    For JavaScript strings, inspect the opening and closing
+                    quotes.
+                </p>
+            </li>
+
+            <li>
+                <strong>Understand the surrounding syntax.</strong>
+                <p>
+                    Look at the code immediately before and after the
+                    reflection point.
+                </p>
+            </li>
+
+            <li>
+                <strong>Construct a context-appropriate proof of concept.</strong>
+                <p>
+                    Use a harmless alert in the authorized lab environment
+                    to confirm execution.
+                </p>
+            </li>
+
+            <li>
+                <strong>Verify execution in the browser.</strong>
+                <p>
+                    A reflected payload in the HTTP response is not enough
+                    by itself; confirm whether the browser executes it.
+                </p>
+            </li>
+        </ol>
+    </section>
+
+    <!-- Comparison -->
+    <section>
+        <h2>16. Comparing HTML Context and JavaScript String Context</h2>
+
+        <div class="table-wrapper">
+            <table>
+                <tr>
+                    <th>Feature</th>
+                    <th>HTML context</th>
+                    <th>JavaScript string context</th>
+                </tr>
+                <tr>
+                    <td>Example</td>
+                    <td><code>&lt;div&gt;USER_INPUT&lt;/div&gt;</code></td>
+                    <td><code>var x = 'USER_INPUT';</code></td>
+                </tr>
+                <tr>
+                    <td>Important delimiters</td>
+                    <td>HTML tags and attributes</td>
+                    <td>String quotes</td>
+                </tr>
+                <tr>
+                    <td>Common encoding concern</td>
+                    <td>HTML encoding</td>
+                    <td>JavaScript string escaping</td>
+                </tr>
+                <tr>
+                    <td>Attack reasoning</td>
+                    <td>Break HTML structure if possible</td>
+                    <td>Break JavaScript string structure if possible</td>
+                </tr>
+                <tr>
+                    <td>Lab lesson</td>
+                    <td>Angle brackets were encoded</td>
+                    <td>Single-quoted string remained vulnerable</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="callout">
+            <strong>Remember:</strong>
+            XSS is a context problem. Always identify where the input lands
+            before deciding what kind of payload to test.
+        </div>
+    </section>
+
+    <!-- Lessons learned -->
+    <section>
+        <h2>17. Key Lessons Learned</h2>
+
+        <ul class="checklist">
+            <li>
+                I learned how to use Burp Suite to intercept and inspect
+                reflected input in an HTTP response.
+            </li>
+
+            <li>
+                I learned to identify the JavaScript context rather than
+                relying only on HTML-based XSS payloads.
+            </li>
+
+            <li>
+                I understood that angle brackets being HTML encoded does
+                not necessarily protect a JavaScript string.
+            </li>
+
+            <li>
+                I learned that <code>alert(1)</code> is simply a function
+                call with an argument.
+            </li>
+
+            <li>
+                I learned how single quotes can affect the boundaries of
+                a JavaScript string.
+            </li>
+
+            <li>
+                I learned why the minus operators are used in the lab's
+                payload.
+            </li>
+
+            <li>
+                I learned that payload construction requires understanding
+                the syntax surrounding the injection point.
+            </li>
+
+            <li>
+                I learned the difference between HTML encoding and
+                JavaScript string escaping.
+            </li>
+
+            <li>
+                I learned to validate XSS execution in the browser rather
+                than relying only on the HTTP response.
+            </li>
+
+            <li>
+                I solved the lab and gained a better understanding of
+                reflected XSS in JavaScript string contexts.
+            </li>
+        </ul>
+    </section>
+
+    <!-- Defensive perspective -->
+    <section>
+        <h2>18. How Developers Can Prevent This Vulnerability</h2>
+
+        <p>
+            The correct defense is to prevent untrusted input from being
+            interpreted as JavaScript code.
+        </p>
+
+        <h3>18.1 Avoid placing untrusted input directly inside JavaScript</h3>
+
+        <p>
+            Vulnerable pattern:
+        </p>
+
+        <pre><code>var searchTerms = 'USER_INPUT';</code></pre>
+
+        <p>
+            A safer approach is to keep user input in a data context rather
+            than generating JavaScript source code from it.
+        </p>
+
+        <h3>18.2 Use context-appropriate escaping</h3>
+
+        <p>
+            If data must be inserted into a JavaScript string, use a
+            reliable JavaScript-aware serialization or escaping mechanism
+            appropriate for the exact context.
+        </p>
+
+        <h3>18.3 Prefer safe DOM APIs</h3>
+
+        <p>
+            Avoid constructing HTML with untrusted values when possible.
+            Use safe DOM APIs and treat user-controlled data as data.
+        </p>
+
+        <h3>18.4 Use Content Security Policy</h3>
+
+        <p>
+            A properly designed Content Security Policy can reduce the
+            impact of some XSS vulnerabilities. However, it should not be
+            treated as a replacement for safe input handling and output
+            encoding.
+        </p>
+
+        <div class="callout warning">
+            <strong>Developer takeaway:</strong>
+            The application should prevent untrusted input from changing
+            JavaScript syntax, not merely encode HTML characters.
+        </div>
+    </section>
+
+    <!-- Final summary -->
+    <section>
+        <h2>19. Final Summary</h2>
+
+        <p>
+            This lab demonstrated a reflected XSS vulnerability caused by
+            inserting user-controlled search input into a JavaScript string.
+        </p>
+
+        <p>
+            My initial troubleshooting involved testing angle brackets,
+            which were returned in encoded form. By using Burp Suite to
+            inspect the response, I identified that the search input was
+            reflected inside a JavaScript variable.
+        </p>
+
+        <p>
+            I then experimented with JavaScript syntax and discovered that
+            the payload:
+        </p>
+
+        <div class="payload">
+            <code>'-alert("Nicholas")-'</code>
+        </div>
+
+        <p>
+            executed successfully in the lab and triggered a browser alert.
+            The official lab payload using <code>alert(1)</code> also worked.
+        </p>
+
+        <p>
+            The most important lesson was that XSS payloads must be
+            constructed according to the injection context. In this case,
+            the vulnerability was inside a JavaScript string, so the key
+            was understanding string boundaries and JavaScript expressions.
+        </p>
+
+        <div class="callout success">
+            <strong>Lab status: Solved.</strong>
+            <br>
+            The lab improved my understanding of reflected XSS, JavaScript
+            string injection, Burp Suite response analysis, and payload
+            construction.
+        </div>
+    </section>
+
+</main>
+
+<footer>
+    <p>
+        PortSwigger Web Security Academy Lab Notes |
+        Reflected XSS into a JavaScript String |
+        Educational use in authorized lab environments
+    </p>
+</footer>
+
+</body>
+</html>

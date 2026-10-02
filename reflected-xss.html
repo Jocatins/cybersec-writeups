@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reflected XSS into Attribute - HTML-Encoded Angle Brackets</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 30px;
+      color: #222;
+      background: #f7f7f7;
+    }
+
+
+h1, h2, h3 {
+  color: #1f2937;
+}
+
+code, pre {
+  font-family: Consolas, monospace;
+}
+
+pre {
+  background: #111827;
+  color: #e5e7eb;
+  padding: 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.box {
+  background: white;
+  border-left: 4px solid #2563eb;
+  padding: 15px 20px;
+  margin: 20px 0;
+  border-radius: 5px;
+}
+
+.warning {
+  border-left-color: #dc2626;
+}
+
+.success {
+  border-left-color: #16a34a;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+  background: white;
+}
+
+th, td {
+  border: 1px solid #ddd;
+  padding: 10px;
+  text-align: left;
+}
+
+th {
+  background: #e5e7eb;
+}
+
+
+  </style>
+</head>
+
+<body>
+
+<h1>Reflected XSS into Attribute with Angle Brackets HTML-Encoded</h1>
+
+<p><strong>Platform:</strong> PortSwigger Web Security Academy</p>
+<p><strong>Difficulty:</strong> Apprentice</p>
+<p><strong>Vulnerability:</strong> Reflected Cross-Site Scripting (XSS)</p>
+<p><strong>Context:</strong> HTML attribute injection</p>
+
+<hr>
+
+<h2>1. Lab Objective</h2>
+
+<p>
+The application contains a reflected XSS vulnerability in the blog search functionality.
+The search parameter is reflected into an HTML attribute.
+</p>
+
+<p>
+However, angle brackets are HTML-encoded, meaning a conventional payload such as
+<code>&lt;script&gt;alert(1)&lt;/script&gt;</code> is not the appropriate approach.
+</p>
+
+<p>
+The objective was to escape the existing HTML attribute and inject an event-handler
+attribute capable of executing JavaScript.
+</p>
+
+<h2>2. Initial Reconnaissance</h2>
+
+<p>
+I started by entering a unique alphanumeric string into the search functionality:
+</p>
+
+<pre>nicholas123</pre>
+
+<p>
+The application reflected the input into the page.
+The important HTML was:
+</p>
+
+<pre>&lt;input type="text"
+       placeholder="Search the blog..."
+       name="search"
+       value="nicholas123"&gt;</pre>
+
+<p>
+This immediately identified the injection context:
+</p>
+
+<pre>value="nicholas123"</pre>
+
+<div class="box success">
+  <strong>Key observation:</strong>
+  The attacker-controlled search parameter is reflected inside a
+  double-quoted HTML attribute.
+</div>
+
+<h2>3. Understanding the Context</h2>
+
+<p>
+The vulnerability was not DOM-based XSS like some of the previous labs I had worked on.
+There was no need to find a JavaScript source such as <code>location.hash</code>
+and no need to identify a JavaScript sink such as <code>document.write()</code>.
+</p>
+
+<p>
+Instead, the flow was:
+</p>
+
+<pre>
+Search parameter
+      ↓
+Server-side reflection
+      ↓
+HTML response
+      ↓
+value="ATTACKER INPUT"
+      ↓
+HTML attribute injection
+      ↓
+JavaScript event handler
+      ↓
+XSS
+</pre>
+
+<h2>4. Testing the Attribute Boundary</h2>
+
+<p>
+I tested how special characters were handled.
+A double quote was particularly important because the application placed the
+search parameter inside a double-quoted attribute.
+</p>
+
+<p>
+Using:
+</p>
+
+<pre>nicholas123"</pre>
+
+<p>
+resulted in HTML resembling:
+</p>
+
+<pre>&lt;input type="text"
+       placeholder="Search the blog..."
+       name="search"
+       value="nicholas123" ""&gt;</pre>
+
+<p>
+This demonstrated that the double quote was not safely encoded and could
+terminate the existing <code>value</code> attribute.
+</p>
+
+<h2>5. Confirming Attribute Injection</h2>
+
+<p>
+Before attempting JavaScript execution, I used a harmless attribute injection
+to confirm that I could control the HTML structure.
+</p>
+
+<pre>nicholas123" data-test="hello</pre>
+
+<p>
+The application produced:
+</p>
+
+<pre>&lt;input type="text"
+       placeholder="Search the blog..."
+       name="search"
+       value="nicholas123"
+       data-test="hello"&gt;</pre>
+
+<p>
+This was the critical confirmation.
+The original structure:
+</p>
+
+<pre>value="nicholas123"</pre>
+
+<p>
+had effectively become:
+</p>
+
+<pre>value="nicholas123" data-test="hello"</pre>
+
+<p>
+Therefore, I had successfully escaped the original attribute and injected
+a new attribute.
+</p>
+
+<h2>6. Choosing the XSS Technique</h2>
+
+<p>
+At this point, the important question became:
+</p>
+
+<blockquote>
+  Can the injected attribute cause JavaScript execution?
+</blockquote>
+
+<p>
+HTML provides event-handler attributes that execute JavaScript when their
+corresponding browser event occurs.
+</p>
+
+<p>
+For this lab, the relevant event was <code>onmouseover</code>.
+</p>
+
+<p>
+The final proof-of-concept payload was:
+</p>
+
+<pre>"onmouseover="alert(1)</pre>
+
+<h2>7. Final Payload</h2>
+
+<p>
+When inserted into the search parameter, the resulting HTML became:
+</p>
+
+<pre>&lt;input type="text"
+       placeholder="Search the blog..."
+       name="search"
+       value="nicholas123"
+       onmouseover="alert(1)"&gt;</pre>
+
+<p>
+The payload therefore transformed the original HTML:
+</p>
+
+<pre>&lt;input value="nicholas123"&gt;</pre>
+
+<p>
+into:
+</p>
+
+<pre>&lt;input value="nicholas123" onmouseover="alert(1)"&gt;</pre>
+
+<p>
+The browser now treats <code>onmouseover</code> as an event handler.
+When the mouse is moved over the injected input element, the JavaScript executes.
+</p>
+
+<h2>8. Why the Attack Worked</h2>
+
+<p>
+The attack worked because the application trusted attacker-controlled data
+inside an HTML attribute.
+</p>
+
+<p>
+The important sequence was:
+</p>
+
+<pre>
+"nicholas123"
+        ↓
+Break out of value=""
+        ↓
+Inject onmouseover=""
+        ↓
+Browser interprets it as an event handler
+        ↓
+alert(1)
+</pre>
+
+<div class="box success">
+  <strong>Core lesson:</strong>
+  XSS payloads are highly dependent on context.
+  The correct payload for JavaScript, HTML text, an HTML attribute,
+  CSS, or a URL context can be completely different.
+</div>
+
+<h2>9. Why &lt;script&gt; Was Not Necessary</h2>
+
+<p>
+A common beginner assumption is that XSS means injecting:
+</p>
+
+<pre>&lt;script&gt;alert(1)&lt;/script&gt;</pre>
+
+<p>
+That is only one possible XSS technique.
+</p>
+
+<p>
+Here, angle brackets were encoded, making tag injection ineffective.
+However, the attacker did not need to create a new HTML element.
+An existing <code>&lt;input&gt;</code> element could be modified by injecting
+an event-handler attribute.
+</p>
+
+<p>
+This is why understanding the HTML parsing context is more valuable than
+memorizing a single XSS payload.
+</p>
+
+<h2>10. The Recon Process I Learned</h2>
+
+<p>
+My initial instinct was to search the page source for JavaScript or jQuery,
+similar to the DOM XSS labs I had previously studied.
+That was not the right approach for this vulnerability.
+</p>
+
+<p>
+A better general workflow is:
+</p>
+
+<table>
+  <tr>
+    <th>Step</th>
+    <th>Question</th>
+  </tr>
+
+  <tr>
+    <td>1. Find input</td>
+    <td>Where can I control data?</td>
+  </tr>
+
+  <tr>
+    <td>2. Test reflection</td>
+    <td>Does my input appear in the response?</td>
+  </tr>
+
+  <tr>
+    <td>3. Identify context</td>
+    <td>Is it HTML text, an attribute, JavaScript, CSS, or a URL?</td>
+  </tr>
+
+  <tr>
+    <td>4. Test encoding</td>
+    <td>Which characters are escaped?</td>
+  </tr>
+
+  <tr>
+    <td>5. Test boundaries</td>
+    <td>Can I escape the current context?</td>
+  </tr>
+
+  <tr>
+    <td>6. Select technique</td>
+    <td>Which browser feature can turn the injection into execution?</td>
+  </tr>
+
+  <tr>
+    <td>7. Test execution</td>
+    <td>Does the payload execute under realistic conditions?</td>
+  </tr>
+</table>
+
+<h2>11. Real-World Application</h2>
+
+<p>
+This type of vulnerability can appear in real applications anywhere user-controlled
+data is inserted into HTML without context-appropriate output encoding.
+</p>
+
+<p>
+Examples include:
+</p>
+
+<ul>
+  <li>Search pages that place the search term into an input's <code>value</code>.</li>
+  <li>Profile pages that insert usernames into HTML attributes.</li>
+  <li>Admin dashboards that populate <code>data-*</code> attributes.</li>
+  <li>Filtering interfaces that preserve query parameters in form fields.</li>
+  <li>Error pages that reflect an invalid parameter.</li>
+  <li>Applications that generate HTML templates using unsanitized user input.</li>
+</ul>
+
+<h2>12. Example Real-World Scenario</h2>
+
+<p>
+Imagine an application generates:
+</p>
+
+<pre>&lt;input value="USER_SEARCH"&gt;</pre>
+
+<p>
+If <code>USER_SEARCH</code> is inserted without appropriate HTML attribute encoding,
+an attacker may attempt to terminate the attribute and inject another attribute.
+</p>
+
+<p>
+The impact depends on the application's security controls, browser behavior,
+authentication context, and where the vulnerable functionality is accessible.
+</p>
+
+<p>
+A successful stored XSS vulnerability can be particularly serious because
+malicious input may persist and execute when other users view the affected page.
+Reflected XSS generally requires the victim to visit a crafted URL or otherwise
+submit attacker-controlled input.
+</p>
+
+<h2>13. Reflected vs Stored vs DOM XSS</h2>
+
+<table>
+  <tr>
+    <th>Type</th>
+    <th>Typical Flow</th>
+  </tr>
+
+  <tr>
+    <td>Reflected XSS</td>
+    <td>Request parameter → Server → HTML response → Browser</td>
+  </tr>
+
+  <tr>
+    <td>Stored XSS</td>
+    <td>Attacker input → Database → Victim's page → Browser</td>
+  </tr>
+
+  <tr>
+    <td>DOM XSS</td>
+    <td>Client-side source → JavaScript sink → DOM → Browser</td>
+  </tr>
+</table>
+
+<p>
+This lab was primarily a lesson in <strong>reflected XSS and HTML attribute context</strong>.
+</p>
+
+<h2>14. Important Lesson About Recon</h2>
+
+<p>
+One of the biggest lessons from this challenge was that reconnaissance should
+be proportional to the problem.
+</p>
+
+<p>
+For a learning exercise, deeply investigating every character can be useful.
+However, in practical security testing, repeatedly performing exhaustive
+recon when the injection context is already obvious can become inefficient.
+</p>
+
+<p>
+Once the following pattern is recognized:
+</p>
+
+<pre>
+User input
+    ↓
+Reflected
+    ↓
+Quoted HTML attribute
+    ↓
+Quote is not encoded
+</pre>
+
+<p>
+an experienced tester should immediately consider:
+</p>
+
+<pre>
+Attribute breakout
+        ↓
+Injected attribute
+        ↓
+Event-handler attributes
+        ↓
+Execution
+</pre>
+
+<p>
+The skill is therefore not memorizing one payload. The skill is recognizing
+the <strong>context → breakout → execution</strong> pattern.
+</p>
+
+<h2>15. Key Takeaways</h2>
+
+<ul>
+  <li>XSS is context-dependent.</li>
+  <li>Finding JavaScript source code is not necessary for reflected XSS.</li>
+  <li>Always determine where attacker-controlled input is reflected.</li>
+  <li>Identify the exact HTML/JavaScript/CSS/URL context.</li>
+  <li>Test how special characters are encoded.</li>
+  <li>A double quote can be significant when input is inside a double-quoted attribute.</li>
+  <li>Angle brackets being encoded does not automatically eliminate XSS.</li>
+  <li>Existing HTML elements can sometimes be turned into execution points through event-handler attributes.</li>
+  <li>A payload that executes during your manual testing may not execute automatically for another user.</li>
+  <li>For real-world testing, always consider how the victim actually interacts with the application.</li>
+</ul>
+
+<div class="box">
+  <strong>My mental model going forward:</strong>
+  <br><br>
+  Don't start by asking:
+  <em>"What XSS payload should I use?"</em>
+  <br><br>
+  Start by asking:
+  <strong>"Where does my input land, what context am I in, and what boundary can I escape?"</strong>
+  <br><br>
+  Once the context is known, the appropriate class of payload becomes much easier to identify.
+</div>
+
+</body>
+</html>

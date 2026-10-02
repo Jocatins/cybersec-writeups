@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Blind SQL Injection (Time-Based) – Write-Up</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 0 20px;
+            color: #222;
+            background: #fafafa;
+        }
+
+        h1,
+        h2,
+        h3 {
+            color: #1a1a1a;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 6px;
+        }
+
+        h1 {
+            font-size: 1.9em;
+        }
+
+        h2 {
+            font-size: 1.4em;
+            margin-top: 2em;
+        }
+
+        h3 {
+            font-size: 1.15em;
+            border-bottom: none;
+        }
+
+        code,
+        pre {
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            background: #f2f2f2;
+            border-radius: 4px;
+        }
+
+        code {
+            padding: 2px 6px;
+            font-size: 0.92em;
+        }
+
+        pre {
+            padding: 12px 16px;
+            overflow-x: auto;
+            border-left: 4px solid #4a90e2;
+            font-size: 0.9em;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 16px 0;
+            background: #fff;
+        }
+
+        th,
+        td {
+            border: 1px solid #ccc;
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        th {
+            background: #eaeaea;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: bold;
+            color: #fff;
+            margin-left: 8px;
+        }
+
+        .badge-solved {
+            background: #28a745;
+        }
+
+        .badge-practitioner {
+            background: #6f42c1;
+        }
+
+        .highlight {
+            background: #fff3cd;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+
+        .note {
+            background: #eef6ff;
+            border-left: 4px solid #4a90e2;
+            padding: 10px 16px;
+            margin: 16px 0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Blind SQL Injection with Time Delays</h1>
+
+    <p>
+        <strong>Lab:</strong> Blind SQL injection with time delays
+        <span class="badge badge-practitioner">PRACTITIONER</span>
+        <span class="badge badge-solved">LAB SOLVED</span>
+    </p>
+
+    <h2>Lab Description</h2>
+    <p>
+        This lab contains a blind SQL injection vulnerability. The application uses a tracking cookie for
+        analytics and performs a SQL query containing the value of the submitted cookie.
+    </p>
+    <p>
+        The results of the SQL query are not returned, and the application does not respond any differently
+        based on whether the query returns any rows or causes an error. However, since the query is executed
+        synchronously, it is possible to trigger conditional time delays to infer information.
+    </p>
+    <p>
+        <strong>Objective:</strong> Exploit the SQL injection vulnerability to cause a 10-second delay.
+    </p>
+
+    <h2>End Goal</h2>
+    <p>
+        To prove that the field is vulnerable to <strong>blind SQL injection (time-based)</strong> by
+        triggering a measurable delay in the server's response.
+    </p>
+
+    <h2>Analysis</h2>
+    <p>
+        I began by reviewing the <strong>SQL Injection Cheat Sheet</strong>, specifically the
+        <em>time delays</em> section, which provides database-specific payloads for introducing a
+        deliberate pause in query execution.
+    </p>
+
+    <h3>Time Delay Payloads by Database</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Database</th>
+                <th>Payload</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Oracle</td>
+                <td><code>dbms_pipe.receive_message(('a'),10)</code></td>
+            </tr>
+            <tr>
+                <td>Microsoft</td>
+                <td><code>WAITFOR DELAY '0:0:10'</code></td>
+            </tr>
+            <tr>
+                <td>PostgreSQL</td>
+                <td><code>SELECT pg_sleep(10)</code></td>
+            </tr>
+            <tr>
+                <td>MySQL</td>
+                <td><code>SELECT SLEEP(10)</code></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>Testing Procedure</h2>
+    <p>
+        The tracking cookie value was the injection point. The original cookie value was replaced with
+        the following payloads to test each database's time-delay function. The response time was measured
+        for each request.
+    </p>
+
+    <h3>PostgreSQL Test</h3>
+    <pre>' || (SELECT pg_sleep(10))--</pre>
+    <p>
+        <strong>Observed response time:</strong>
+        <span class="highlight">10563 ms (~10.5 seconds)</span>
+    </p>
+    <p>
+        This confirms two things:
+    </p>
+    <ul>
+        <li>The backend database is <strong>PostgreSQL</strong>.</li>
+        <li>The parameter is vulnerable to <strong>blind SQL injection with time delays</strong>.</li>
+    </ul>
+
+    <h3>MySQL Test</h3>
+    <pre>' || (SELECT SLEEP(10))--</pre>
+    <p>
+        <strong>Observed response time:</strong>
+        <span class="highlight">433 ms</span>
+    </p>
+    <p>
+        The query returned almost immediately, confirming that the backend is <strong>not MySQL</strong>
+        (as expected, since the PostgreSQL payload already succeeded).
+    </p>
+
+    <div class="note">
+        <strong>Result:</strong> The <code>pg_sleep(10)</code> payload caused a ~10-second delay,
+        proving the parameter is vulnerable to <strong>time-based blind SQL injection</strong> and
+        that the database engine is <strong>PostgreSQL</strong>.
+    </div>
+
+    <h2>Conclusion</h2>
+    <p>
+        The application is vulnerable to blind SQL injection via a time-delay technique. Because the
+        query executes synchronously and no output or error differences are reflected back to the client,
+        time-based inference is the only viable route to extract data. The successful payload
+        <code>' || (SELECT pg_sleep(10))--</code> confirmed the vulnerability and identified the
+        backend DBMS.
+    </p>
+
+    <h2>Lab Status</h2>
+    <p><strong>✅ Lab Solved</strong> — a 10-second delay was successfully triggered.</p>
+
+</body>
+
+</html>
